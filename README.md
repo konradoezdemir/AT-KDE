@@ -84,17 +84,9 @@ This command will use the AT-KDE approach to model inter-arrival times based on 
 python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method kde --run 1
 ```
 ## Usage Example: Multi/Comparison Data Simulation
-This command will run all benchmark models and AT-KDE on a selection of datasets in the data directory. 
+This command will run all benchmark models and AT-KDE on a selection of datasets in the data directory. Results are stored as an .xlsx reporting root-cadd scores and a jpeg with arrival count plot comparisons.
 ```bash
 cd run_shells
 ./run_all.ps1 #for windows 
 sh run_all.sh #for linux/mac
 ```
-
-## The results are stored by default in diagnostics/results and may look like this: 
-**Root-CADD Scores**
-
-![CADD Scores](root_CADD.png)
-
-**Arrival Count Plots**
-![Arrival Count Plots](diagnostics\results\performance_overview_simulations.jpeg)
