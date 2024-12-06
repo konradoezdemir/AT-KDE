@@ -38,6 +38,7 @@ Simulation is a critical tool for analyzing, improving, and redesigning organiza
 | ACR                 | 954     | 148             | 0                    | 6.4                   | 26                   |
 | Production          | 225     | 88              | 0                    | 2.5                   | 11                   |
 
+All the event logs can be found in this [Google Drive folder](https://drive.google.com/file/d/1abPg1txA6P9jyNfmhJel2kZNCP0FdmAW/view?usp=sharing).
 
 ## Repository Structure
 
