@@ -7,9 +7,6 @@ from datetime import timedelta, datetime, timezone
 import itertools
 import traceback
 
-from source.arrival_distribution import get_boundaries_of_day
-
-
 class ProphetIATGenerator():
     """
     Generates inter arrival times by training the Prophet Time Series Model
@@ -17,23 +14,20 @@ class ProphetIATGenerator():
 
     def __init__(self, train_arrival_times, data_n_seqs) -> None:
         self.train = train_arrival_times
-        self.lower_bound, self.upper_bound = get_boundaries_of_day(self.train) # bounds are given in elapsed time of the day in seconds
         self.n_seqs = data_n_seqs
-
-        # TODO check if trained model is already available and if so load that
-        # TODO save models
-
 
     def generate_arrivals(self, start_time):
         time_series_df, max_cap = self.get_time_series_df()
-
         model = self.train_prophet_model(df=time_series_df)
-
         # use trained model to generate arrivals
         gen = list()
         n_gen_inst = 0
-        while n_gen_inst < self.n_seqs:
-            future = pd.date_range(start=start_time, end=(start_time + timedelta(days=30)), freq='D').to_frame(
+        # create a list from self.n_seqs that defines the days parameter in date_range
+        days_list = [30] * (self.n_seqs // 30) + [self.n_seqs % 30]
+        if days_list[-1] == 0:
+            days_list = days_list[:-1]
+        for days in days_list:
+            future = pd.date_range(start=start_time, end=(start_time + timedelta(days=days)), freq='h').to_frame(
                 name='ds', index=False)
 
             future['cap'] = max_cap
@@ -48,34 +42,19 @@ class ProphetIATGenerator():
 
             forecast['gen'] = forecast.apply(rand_value, axis=1)
             forecast['gen_round'] = np.ceil(forecast['gen'])
-            # n_gen_inst += np.sum(forecast['gen_round'])
-            n_gen_inst += len(forecast['gen_round'])
             gen.append(forecast[forecast.gen_round > 0][['ds', 'gen_round']])
             start_time = forecast.ds.max()
         gen = pd.concat(gen, axis=0, ignore_index=True)
-        gen = gen[:self.n_seqs]
 
         def pp(start, n):
-            # start_unix = int(start.value // 10 ** 9)
-            # end_unix = int((start + timedelta(hours=1)).value // 10 ** 9)
-            day = datetime.combine(start.date(), datetime.min.time())
-            timestamp_first = day + timedelta(seconds=self.lower_bound)
-            timestamp_last = day + timedelta(seconds=self.upper_bound)
-
-            # transform lower and upper timestamp into unix timestamps
-            start_unix = (timestamp_first - datetime(1970, 1, 1)) / timedelta(seconds=1)
-            end_unix = (timestamp_last - datetime(1970, 1, 1)) / timedelta(seconds=1)
-
-            timestamps_unix = np.random.randint(start_unix, end_unix, int(n))
-            timestamps_unix = sorted(timestamps_unix)
-
-            return pd.to_datetime(timestamps_unix, unit='s').to_frame(name='timestamp')
+            start_u = int(start.value // 10 ** 9)
+            end_u = int((start + timedelta(hours=1)).value // 10 ** 9)
+            return pd.to_datetime(np.random.randint(start_u, end_u, int(n)), unit='s').to_frame(name='timestamp')
 
         gen_cases = list()
         for row in gen.itertuples(index=False):
             gen_cases.append(pp(row.ds, row.gen_round))
         times = pd.concat(gen_cases, axis=0, ignore_index=True)
-        # times = times.iloc[:num_instances]
         case_arrival_times = list(times['timestamp'])
 
         return case_arrival_times
@@ -93,7 +72,7 @@ class ProphetIATGenerator():
         df['timestamp'] = pd.to_datetime(df['timestamp'], format='%Y-%m-%d %H:%M:%S.%f').dt.tz_localize(None)
 
         # Aggregating data: Number of arrivals per hour
-        df = df.set_index('timestamp').resample('D').size().reset_index(name='arrivals')
+        df = df.set_index('timestamp').resample('h').size().reset_index(name='arrivals')
 
         # Rename columns to fit Prophet's expected format
         df.rename(columns={'timestamp': 'ds', 'arrivals': 'y'}, inplace=True)
@@ -114,8 +93,8 @@ class ProphetIATGenerator():
         days = df.ds.max() - df.iloc[int(len(df) * 0.8)].ds
         periods = days * 0.5
 
-        param_grid = {'changepoint_prior_scale': [0.1],# [0.001, 0.01, 0.1, 0.5],
-                        'seasonality_prior_scale': [0.1],#[0.01, 0.1, 1.0, 10.0]
+        param_grid = {'changepoint_prior_scale': [0.001, 0.01, 0.1, 0.5],
+                        'seasonality_prior_scale': [0.01, 0.1, 1.0, 10.0]
                         }
 
         # Generate all combinations of parameters
