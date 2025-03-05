@@ -159,7 +159,8 @@ cython_debug/
 
 # event logs
 data
-# /event_log_simulations/simulations
+data/event_logs/
+/event_log_simulations/
 # data/event_logs/BPI_Challenge_2019.csv
 # event_log_simulations/event_logs/BPIC_2017_W.csv
 # event_log_simulations/event_logs/Confidential_1000.csv

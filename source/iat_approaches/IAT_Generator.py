@@ -5,6 +5,7 @@ from source.iat_approaches.PDF import PDFIATGenerator
 from source.iat_approaches.prophet_ import ProphetIATGenerator
 from source.iat_approaches.kde import KDEIATGenerator
 from source.arrival_distribution import DurationDistribution
+from source.iat_approaches.lstm import LSTM_IAT_Generator
 
 class IAT_Generator():
     """
@@ -69,6 +70,9 @@ class IAT_Generator():
                                             probabilistic_day=self.prob_day,
                                             kwargs = kwargs
                                             )
+        elif method == 'lstm':
+            self.generator = LSTM_IAT_Generator(self.train_arrival_times, self.data_n_seqs, inter_arrival_durations=self.inter_arrival_durations,)
+
         # elif method == 'kde_prob':
         #     arrival_likelihood = True
         #     # probabilistic = True
