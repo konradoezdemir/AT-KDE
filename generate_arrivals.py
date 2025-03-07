@@ -98,7 +98,7 @@ def store_data(event_log_data, case_arrival_times, test, train, args):
     else:
         dir = os.path.join('synthetic_data', 'simulations')
 
-    if args.prob_day == "True" and args.method != 'prophet' and args.method != 'lstm' and args.method != 'gru':
+    if args.prob_day == "True" and args.method != 'prophet' and args.method != 'lstm' and args.method != 'gru' and args.method != 'chronos':
         method = f"{args.method}_prob"
     else:
         method = args.method

@@ -136,27 +136,50 @@ for ((i=1; i<=TotalRuns; i++)); do
     # echo "-----------------------------"
 
     # Run lstm approach
-    echo "Running lstm approach for iteration $i..."
-    python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset PermitLog --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset P2P --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset Production --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset env_permit --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset HelpDesk --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset Hospital --method lstm --run $i
-    python generate_arrivals.py --input_type event_log --dataset Sepsis --method lstm --run $i
+    # echo "Running lstm approach for iteration $i..."
+    # python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset PermitLog --method lstm --run $i
+    # # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset P2P --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset Production --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset env_permit --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset HelpDesk --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset Hospital --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset Sepsis --method lstm --run $i
+
+    # Run chronos approach
+    echo "Running chronos approach for iteration $i..."
+    python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset PermitLog --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset P2P --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset Production --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset env_permit --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset HelpDesk --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset Hospital --method chronos --run $i
+    python generate_arrivals.py --input_type event_log --dataset Sepsis --method chronos --run $i
 
     echo "Complete."
     echo "-----------------------------"
@@ -167,7 +190,7 @@ echo "All runs completed successfully!"
 # Run evaluation pipeline
 echo "Running evaluation pipeline..."
 cd "$(dirname "$(realpath "$0")")/../diagnostics"
-python eval_event_logs.py --res_dir=results --total_runs=$TotalRuns --metric=CADD --method_types=prob --methods=lstm
+python eval_event_logs.py --res_dir=results --total_runs=$TotalRuns --metric=CADD --method_types=prob --methods=chronos
 echo "Complete."
 echo "-----------------------------"
 

@@ -85,7 +85,7 @@ class Evaluation:
         # Define available methods for each type
         self.available_methods = {
             'raw': ['mean', 'exponential', 'best_distribution', 'kde'],
-            'prob': ['mean_prob', 'exponential_prob', 'best_distribution_prob', 'prophet', 'kde_prob', 'lstm']
+            'prob': ['mean_prob', 'exponential_prob', 'best_distribution_prob', 'prophet', 'kde_prob', 'lstm', 'chronos']
         }
 
         # Initialize method lists based on user input or defaults
@@ -164,6 +164,10 @@ class Evaluation:
                                 elif method == 'mean_prob':
                                     self.sim_data[method].append(sim_data)
                                 elif method == 'prophet':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'chronos':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'lstm':
                                     self.sim_data[method].append(sim_data)
 
                         # transform string to datetime
