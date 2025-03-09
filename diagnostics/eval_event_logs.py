@@ -85,6 +85,7 @@ class Evaluation:
         self.dataset_name_prophet, self.test_prophet, self.sim_prophet = [], [], []
         self.dataset_name_baseline, self.test_baseline, self.sim_baseline = [], [], []
         self.dataset_name_kde, self.test_kde, self.sim_kde = [], [], []
+        self.dataset_name_npp, self.test_npp, self.sim_npp = [], [], []
 
         self.method_types = method_types
         self.data_drawn = False #draw_simulated_n_true_data needs to be called prior to any other operation 
@@ -106,9 +107,9 @@ class Evaluation:
         progress_bar = tqdm(total=model_count, desc='Drawing results from simulated data..', position=0)
 
         if self.method_types == 'raw':
-            folders = ['mean', 'exponential', 'best_distribution', 'kde']
+            folders = ['mean', 'exponential', 'best_distribution','npp', 'kde']
         elif self.method_types == 'prob':
-            folders = ['mean_prob', 'exponential_prob', 'best_distribution_prob', 'prophet', 'kde_prob']
+            folders = ['mean_prob', 'exponential_prob', 'best_distribution_prob', 'prophet','npp_prob', 'kde_prob']
         # iterate over each subfolder in the base directory
         for folder in folders:
             folder_path = os.path.join(self.simulations_path, folder)
@@ -125,6 +126,8 @@ class Evaluation:
                         self.dataset_name_mean.append(subfolder)
                     elif folder == 'kde' and subfolder not in self.dataset_name_kde:
                         self.dataset_name_kde.append(subfolder)
+                    elif folder == 'npp' and subfolder not in self.dataset_name_npp:
+                        self.dataset_name_npp.append(subfolder)
                 elif self.method_types == 'prob':
                     if folder == 'best_distribution_prob' and subfolder not in self.dataset_name_baseline:
                         self.dataset_name_baseline.append(subfolder)
@@ -136,7 +139,8 @@ class Evaluation:
                         self.dataset_name_prophet.append(subfolder)
                     elif folder == 'kde_prob' and subfolder not in self.dataset_name_kde:
                         self.dataset_name_kde.append(subfolder)
-
+                    elif folder == 'npp_prob' and subfolder not in self.dataset_name_npp:
+                        self.dataset_name_npp.append(subfolder)
                 #check if the path is a directory
                 if os.path.isdir(subfolder_path):
                     if subfolder not in results_dict:
@@ -151,6 +155,8 @@ class Evaluation:
                             self.test_baseline.append(test_data)
                         elif folder == 'kde':
                             self.test_kde.append(test_data)
+                        elif folder == 'npp':
+                            self.test_npp.append(test_data)
                         elif folder == 'exponential':
                             self.test_expon.append(test_data)
                         elif folder == 'mean':
@@ -160,6 +166,8 @@ class Evaluation:
                             self.test_baseline.append(test_data)
                         elif folder == 'kde_prob':
                             self.test_kde.append(test_data)
+                        elif folder == 'npp_prob':
+                            self.test_npp.append(test_data)
                         elif folder == 'exponential_prob':
                             self.test_expon.append(test_data)
                         elif folder == 'mean_prob':
@@ -181,6 +189,8 @@ class Evaluation:
                                     self.sim_baseline.append(sim_data)
                                 elif folder == 'kde':
                                     self.sim_kde.append(sim_data)
+                                elif folder == 'npp':
+                                    self.sim_npp.append(sim_data)
                                 elif folder == 'exponential':
                                     self.sim_expon.append(sim_data)
                                 elif folder == 'mean':
@@ -191,6 +201,8 @@ class Evaluation:
                                     self.sim_baseline.append(sim_data)
                                 elif folder == 'kde_prob':
                                     self.sim_kde.append(sim_data)
+                                elif folder == 'npp_prob':
+                                    self.sim_npp.append(sim_data)
                                 elif folder == 'exponential_prob':
                                     self.sim_expon.append(sim_data)
                                 elif folder == 'mean_prob':
@@ -342,6 +354,7 @@ class Evaluation:
                 formatted_baseline = f"{values['best_distribution']['mean']} ({values['best_distribution']['std']})"
                 # formatted_prophet = f"{values['prophet']['mean']} ({values['prophet']['std']})"
                 formatted_kde = f"{values['kde']['mean']} ({values['kde']['std']})"
+                formatted_npp = f"{values['npp']['mean']} ({values['npp']['std']})"
                 # formatted_kde_prob = f"{values['kde_prob']['mean']} ({values['kde_prob']['std']})"
 
                 row_data = {
@@ -351,6 +364,7 @@ class Evaluation:
                     'best_distribution': formatted_baseline,
                     # 'prophet': formatted_prophet,
                     'kde': formatted_kde,
+                    'npp': formatted_npp,
                     # 'kde_prob': formatted_kde_prob,
                 }
                 mean_row_data = {
@@ -360,6 +374,7 @@ class Evaluation:
                     'best_distribution': values['best_distribution']['mean'],
                     # 'prophet': values['prophet']['mean'],
                     'kde': values['kde']['mean'],
+                    'npp': values['npp']['mean'],
                     # 'kde_prob': values['kde_prob']['mean'],
                 }
                 rows.append(row_data)
@@ -371,6 +386,7 @@ class Evaluation:
                 formatted_baseline = f"{values['best_distribution_prob']['mean']} ({values['best_distribution_prob']['std']})"
                 formatted_prophet = f"{values['prophet']['mean']} ({values['prophet']['std']})"
                 formatted_kde = f"{values['kde_prob']['mean']} ({values['kde_prob']['std']})"
+                formatted_npp = f"{values['npp_prob']['mean']} ({values['npp_prob']['std']})"
                 # formatted_kde_prob = f"{values['kde_prob']['mean']} ({values['kde_prob']['std']})"
 
                 row_data = {
@@ -380,6 +396,7 @@ class Evaluation:
                     'best_distribution_prob': formatted_baseline,
                     'prophet': formatted_prophet,
                     'kde_prob': formatted_kde,
+                    'npp_prob': formatted_npp,
                     # 'kde_prob': formatted_kde_prob,
                 }
                 mean_row_data = {
@@ -389,6 +406,7 @@ class Evaluation:
                     'best_distribution_prob': values['best_distribution_prob']['mean'],
                     'prophet': values['prophet']['mean'],
                     'kde_prob': values['kde_prob']['mean'],
+                    'npp_prob': values['npp_prob']['mean'],
                     # 'kde_prob': values['kde_prob']['mean'],
                 }
                 rows.append(row_data)
@@ -403,9 +421,9 @@ class Evaluation:
             dataset_entry = row['dataset']
 
             if self.method_types == 'raw':
-                min_column = row[['mean', 'exponential', 'best_distribution', 'kde']].idxmin()
+                min_column = row[['mean', 'exponential', 'best_distribution','npp', 'kde']].idxmin()
             elif self.method_types == 'prob':
-                min_column = row[['mean_prob', 'exponential_prob', 'best_distribution_prob', 'prophet', 'kde_prob']].idxmin()
+                min_column = row[['mean_prob', 'exponential_prob', 'best_distribution_prob', 'prophet','npp_prob', 'kde_prob']].idxmin()
 
             min_value = row[min_column]
             print(f"Dataset Entry: {dataset_entry}, Minimum Value: {min_value}, Respective Column: {min_column}")
@@ -467,19 +485,22 @@ class Evaluation:
             df_base = self.get_date_frequency_df(self.sim_baseline[i])
             df_prophet = self.get_date_frequency_df(self.sim_prophet[i])
             df_kde = self.get_date_frequency_df(self.sim_kde[i])
+            df_npp = self.get_date_frequency_df(self.sim_npp[i])
 
             # Plotting
             ax[i, 0].bar(df_test['date'], df_test['occurrences'], width=0.8, align='center', color='skyblue')
             ax[i, 1].bar(df_mean['date'], df_mean['occurrences'], width=0.8, align='center', color='skyblue')
             ax[i, 2].bar(df_base['date'], df_base['occurrences'], width=0.8, align='center', color='skyblue')
             ax[i, 3].bar(df_prophet['date'], df_prophet['occurrences'], width=0.8, align='center', color='skyblue')
-            ax[i, 4].bar(df_kde['date'], df_kde['occurrences'], width=0.8, align='center', color='skyblue')
+            ax[i, 4].bar(df_npp['date'], df_npp['occurrences'], width=0.8, align='center', color='skyblue')
+            ax[i, 5].bar(df_kde['date'], df_kde['occurrences'], width=0.8, align='center', color='skyblue')
 
             # Add titles to each subplot
             ax[i, 0].set_title(f'{self.dataset_name_baseline[i]} - Test', fontsize=14)
             ax[i, 1].set_title(f'{self.dataset_name_baseline[i]} - Simulated Mean', fontsize=14)
             ax[i, 2].set_title(f'{self.dataset_name_baseline[i]} - Simulated Baseline', fontsize=14)
             ax[i, 3].set_title(f'{self.dataset_name_baseline[i]} - Simulated Prophet', fontsize=14)
+            ax[i, 5].set_title(f'{self.dataset_name_baseline[i]} - Simulated NPP', fontsize=14)
             ax[i, 4].set_title(f'{self.dataset_name_baseline[i]} - Simulated KDE', fontsize=14)
 
             # Get the date range from df_test

@@ -1,153 +1,101 @@
 #!/bin/bash
+#SBATCH --partition=single
+#SBATCH --ntasks=1
+#SBATCH --time=24:00:00 
+#SBATCH --job-name=at_kde_full_run
+#SBATCH --mail-type=BEGIN,END
+#SBATCH --mail-user=konrad.oezdemir@uni-mannheim.de
 
-echo "Move to main directory."
-cd "$(dirname "$(realpath "$0")")/../"
+# single,fat
+
+echo "Initializing job: $SLURM_JOB_NAME with Job ID: $SLURM_JOBID"
+echo "Job running on partition(s): $SLURM_JOB_PARTITION"
+echo "Sending job status notifications to: $SLURM_MAIL_USER"
+echo "-------------------------------------"
+
+# Load required modules
+echo "Loading GNU Compiler v13.3..."
+module load compiler/gnu/13.3
+echo "Loading Miniconda environment..."
+module load devel/miniconda
+echo "Activating the base conda environment..."
+source activate base
+
+# Activate specific Conda environment
+echo "Switching to project-specific Conda environment: at_kde"
+conda activate at_kde
+
+# Change directory to the parent directory of the script directory
+echo "Switch to main repo dir.."
+cd "/pfs/data5/home/ma/ma_ma/ma_kooezdem/github_repo/AT-KDE"
+
 echo "Complete."
 echo "-----------------------------"
 
 # Define the total number of iterations
-TotalRuns=1
-echo "Begin simulating $TotalRuns runs of data simulation."
+TotalRuns=10
+echo "Begin simulating ${TotalRuns} runs of data simulation."
 
-for ((i=1; i<=TotalRuns; i++)); do
-    # Run mean approach
-    echo "Running mean approach for iteration $i..."
-    python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset PermitLog --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset P2P --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset Production --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset env_permit --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset HelpDesk --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset Hospital --method mean --run $i
-    python generate_arrivals.py --input_type event_log --dataset Sepsis --method mean --run $i
-    echo "Complete."
+for i in $(seq 1 $TotalRuns); do
+    # Uncomment the following line to display the iteration number:
+    # echo "Iteration: ${i}"
+    
+    # Run npp approach commands
+    python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset PermitLog --method npp --run "$i"
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset P2P --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset Production --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method npp --run "$i"
+    # python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset env_permit --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset HelpDesk --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset Hospital --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset Sepsis --method npp --run "$i"
+    
+    echo "complete."
     echo "-----------------------------"
 
-    # Run exponential approach
-    echo "Running exponential approach for iteration $i..."
-    python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset PermitLog --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset P2P --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset Production --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset env_permit --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset HelpDesk --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset Hospital --method exponential --run $i
-    python generate_arrivals.py --input_type event_log --dataset Sepsis --method exponential --run $i
-    echo "Complete."
-    echo "-----------------------------"
-
-    # Run best_distribution approach
-    echo "Running best_distribution approach for iteration $i..."
-    python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset PermitLog --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset P2P --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset Production --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset env_permit --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset HelpDesk --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset Hospital --method best_distribution --run $i
-    python generate_arrivals.py --input_type event_log --dataset Sepsis --method best_distribution --run $i
-    echo "Complete."
-    echo "-----------------------------"
-
-    # Run prophet approach
-    echo "Running prophet approach for iteration $i..."
-    python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset PermitLog --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset P2P --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset Production --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset env_permit --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset HelpDesk --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset Hospital --method prophet --run $i
-    python generate_arrivals.py --input_type event_log --dataset Sepsis --method prophet --run $i
-    echo "Complete."
-    echo "-----------------------------"
-
-    # Run kde approach
-    echo "Running kde approach for iteration $i..."
-    python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset PermitLog --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset P2P --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset Production --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset env_permit --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset HelpDesk --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset Hospital --method kde --run $i
-    python generate_arrivals.py --input_type event_log --dataset Sepsis --method kde --run $i
-    echo "Complete."
-    echo "-----------------------------"
-
-    echo "Complete."
-    echo "-----------------------------"
+    # The following sections (mean, exponential, best_distribution, prophet, kde) are commented out.
 done
 
 echo "All runs completed successfully!"
 
-# Run evaluation pipeline
 echo "Running evaluation pipeline..."
-cd "$(dirname "$(realpath "$0")")/../diagnostics"
-python eval_event_logs.py --res_dir=results --total_runs=$TotalRuns --metric=CADD --method_types=prob
+cd "/pfs/data5/home/ma/ma_ma/ma_kooezdem/github_repo/AT-KDE/diagnostics"
 echo "Complete."
+
+python eval_event_logs.py --res_dir=results --total_runs "$TotalRuns" --metric=CADD --method_types=prob
+echo "complete."
 echo "-----------------------------"
 
-echo "Finishing script now."
-cd ..
+echo "finishing script now."
+
+# -------------------------------
+echo "Cleaning up environment..."
+echo "Deactivating Conda environment: at_kde"
+conda deactivate
+echo "Unloading Miniconda module..."
+module unload devel/miniconda
+echo "Unloading GNU Compiler module..."
+module unload compiler/gnu/13.3
+
+# -------------------------------
+echo "Sending job completion notification..."
+echo "Attaching output log to email for review"
+mail -s "Job $SLURM_JOBID - at_kde_full_run Completed" -A output.txt konrad.oezdemir@uni-mannheim.de < /dev/null
+
+# -------------------------------
+echo "Job execution completed successfully!"
+echo "Exiting script..."
 exit 0
+
