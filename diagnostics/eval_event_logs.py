@@ -85,7 +85,7 @@ class Evaluation:
         # Define available methods for each type
         self.available_methods = {
             'raw': ['mean', 'exponential', 'best_distribution', 'kde'],
-            'prob': ['mean_prob', 'exponential_prob', 'best_distribution_prob', 'prophet', 'kde_prob', 'lstm', 'chronos']
+            'prob': ['mean_prob', 'exponential_prob', 'best_distribution_prob', 'prophet', 'kde_prob', 'lstm', 'chronos', 'xgboost']
         }
 
         # Initialize method lists based on user input or defaults
@@ -168,6 +168,8 @@ class Evaluation:
                                 elif method == 'chronos':
                                     self.sim_data[method].append(sim_data)
                                 elif method == 'lstm':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'xgboost':
                                     self.sim_data[method].append(sim_data)
 
                         # transform string to datetime
@@ -279,7 +281,8 @@ class Evaluation:
                             distance = case_arrival_distribution_distance_custom(
                                 original_arrival_times=test_data_for_distance,
                                 simulated_arrival_times=sim_data_for_distance,
-                                bin=bin
+                                bin=bin,
+                                normalize=False,
                             )
                             distances[f'run_{run}'] = distance
                         print('calculations complete.\n')
