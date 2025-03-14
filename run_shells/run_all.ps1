@@ -11,28 +11,28 @@ Write-Output "Begin simulating {$TotalRuns} runs of data simulation."
 for ($i = 1; $i -le $TotalRuns; $i++) {
     # Write-Output "Iteration: {$i}"
 
-    # Write-Output 'run npp approach now..'
-    python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset PermitLog --method npp --run $i # 
-    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method npp --run $i 
-    python generate_arrivals.py --input_type event_log --dataset P2P --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset Production --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method npp --run $i # 
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method npp --run $i #
-    # python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset env_permit --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset HelpDesk --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset Hospital --method npp --run $i #
-    python generate_arrivals.py --input_type event_log --dataset Sepsis --method npp --run $i #
-    Write-Output 'complete.'
+    # # Write-Output 'run npp approach now..'
+    # python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset PermitLog --method npp --run $i # 
+    # # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method npp --run $i 
+    # python generate_arrivals.py --input_type event_log --dataset P2P --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset Production --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method npp --run $i # 
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method npp --run $i #
+    # # python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset env_permit --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset HelpDesk --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset Hospital --method npp --run $i #
+    # python generate_arrivals.py --input_type event_log --dataset Sepsis --method npp --run $i #
+    # Write-Output 'complete.'
     Write-Output '-----------------------------'
 
 
