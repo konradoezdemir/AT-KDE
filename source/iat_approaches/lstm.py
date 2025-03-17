@@ -100,7 +100,6 @@ class LSTM_IAT_Generator:
             })
         
         train_data = pd.DataFrame(inter_arrival_times)
-        print(f"train_data\n: {train_data}")
         
         # Fit and apply transformation
         self.scaler.fit(train_data[['inter_time']])
@@ -128,15 +127,6 @@ class LSTM_IAT_Generator:
     def _prepare_and_train_model(self):
         """Prepares data and trains the LSTM model."""
         X_train, y_train = self._prepare_training_data()
-        
-        # Print some statistics about the data
-        print("Training data statistics:")
-        print(f"X_train shape: {X_train.shape}")
-        print(f"y_train shape: {y_train.shape}")
-        print(f"y_train mean: {np.mean(y_train)}")
-        print(f"y_train std: {np.std(y_train)}")
-        print(f"y_train min: {np.min(y_train)}")
-        print(f"y_train max: {np.max(y_train)}")
 
         n_samples = len(X_train)
         batch_size = min(32, max(4, n_samples // 10))
@@ -220,7 +210,6 @@ class LSTM_IAT_Generator:
             sequence[-1, 1:] = [hour_sin, hour_cos, week_of_month, 
                               month_sin, month_cos, quarter, is_weekend] + weekday_ohe
             sequence = sequence.reshape(1, self.sequence_length, sequence.shape[1])
-            print(f"sequence: {sequence}")
 
             # Predict next IAT
             predicted_scaled_iat = self.model.predict(sequence, verbose=0)[0][0]
@@ -246,8 +235,6 @@ class LSTM_IAT_Generator:
             if len(recent_iats) > 5 and predicted_iat < np.mean(recent_iats) * 0.1:
                 predicted_iat = np.mean(recent_iats)
             
-            print(f"predicted_scaled_iat: {predicted_scaled_iat}, predicted_iat: {predicted_iat}")
-
             # Generate next timestamp
             next_time = generated_times[-1] + timedelta(seconds=float(predicted_iat))
             

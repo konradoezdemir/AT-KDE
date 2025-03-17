@@ -1,13 +1,13 @@
 # README: AT-KDE
 
-Code Base for Paper "A Divide-and-Conquer Approach for Modeling Arrival Times in Dynamic Environments" by L. Kirchdorfer and K. Özdemir et al. (2024)
+Code Base for Paper "A Divide-and-Conquer Approach for Modeling Arrival Times in Dynamic Environments" by L. Kirchdorfer and K. Özdemir et al. (2025)
 ![](https://github.com/konradoezdemir/AT-KDE/blob/main/Flowchart_AT-KDE.png)
 
 ## Introduction
 
 **Abstract**
 
-Simulation is a critical tool for analyzing, improving, and redesigning organizational processes and their supporting information systems. A key component of simulation is the case-arrival model, which determines the pattern of new case entries into a process. Accurate case-arrival modeling is essential for reliable simulations, yet existing approaches often rely on oversimplified static distributions of inter-arrival times. These approaches fail to capture the dynamic and temporal complexities inherent in organizational environments, leading to less accurate and reliable outcomes. To address this limitation, we propose \emph{Auto Time Kernel Density Estimation} (AT-KDE), a divide-and-conquer approach that models arrival times by incorporating global dynamics, day-of-week variations, and intraday distributional changes, ensuring both precision and scalability. Experiments conducted across 20 diverse processes demonstrate that AT-KDE is considerably more accurate and robust than existing approaches while maintaining runtime efficiency.
+Business Process Simulation (BPS) is a critical tool for analyzing and improving organizational processes by estimating the impact of process changes. A key component of BPS is the case-arrival model, which determines the pattern of new case entries into a process. Although accurate case-arrival modeling is essential for reliable simulations---as it influences waiting and overall cycle times---existing approaches often rely on oversimplified static distributions of inter-arrival times. These approaches fail to capture the dynamic and temporal complexities inherent in organizational environments, leading to less accurate and reliable outcomes. To address this limitation, we propose \emph{Auto Time Kernel Density Estimation} (AT-KDE), a divide-and-conquer approach that models arrival times of processes by incorporating global dynamics, day-of-week variations, and intraday distributional changes, ensuring both precision and scalability. Experiments conducted across 20 diverse processes demonstrate that AT-KDE is far more accurate and robust than existing approaches while maintaining sensible execution time efficiency.
 
 **Key features:**
 
@@ -38,8 +38,6 @@ Simulation is a critical tool for analyzing, improving, and redesigning organiza
 | Confidential 2000   | 2000    | 358             | 0                    | 5.6                   | 16                   |
 | ACR                 | 954     | 148             | 0                    | 6.4                   | 26                   |
 | Production          | 225     | 88              | 0                    | 2.5                   | 11                   |
-
-All the event logs can be found in this [Google Drive folder](https://drive.google.com/file/d/1abPg1txA6P9jyNfmhJel2kZNCP0FdmAW/view?usp=sharing).
 
 ## Repository Structure
 

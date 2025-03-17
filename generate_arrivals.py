@@ -20,6 +20,7 @@ def parse_arguments():
     parser.add_argument('--method', type=str, default='all', help='Method to simulate inter-arrival times (mean, exponential, best_distribution, prophet, kde)')
     parser.add_argument('--prob_day', type=str, default='True', help='If the method should probabilistically consider non-working days')
     parser.add_argument('--run', type=int, default=1, help='current run index - necessary for robust result construction')
+    parser.add_argument('--seed', type=int, default=0, help='seed for the xgboost model')
     parser.add_argument('--kwargs', nargs='*', action=KwargsAction, default={}, help='Method-specific parameters as key=value pairs.')
     args = parser.parse_args()
 
@@ -187,7 +188,8 @@ if __name__ == "__main__":
                                 train_arrival_times=train, 
                                 inter_arrival_durations=inter_arrival_durations, 
                                 data_n_seqs=data_n_seqs, 
-                                kwargs = args.kwargs
+                                kwargs = args.kwargs,
+                                seed = args.seed
                             )
 
     # generate arrivals
