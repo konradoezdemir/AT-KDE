@@ -9,8 +9,9 @@ Write-Output "-----------------------------"
 $TotalRuns = 10
 Write-Output "Begin simulating {$TotalRuns} runs of data simulation."
 for ($i = 1; $i -le $TotalRuns; $i++) {
-    # Write-Output "Iteration: {$i}"
-
+    Write-Output "Iteration: {$i}"
+    python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method npp --run "$i"
+    python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method npp --run "$i"
     # # Write-Output 'run npp approach now..'
     # python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method npp --run $i #
     # python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method npp --run $i #

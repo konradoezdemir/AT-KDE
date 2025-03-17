@@ -65,7 +65,6 @@ for i in $(seq 1 $TotalRuns); do
     echo "complete."
     echo "-----------------------------"
 
-    # The following sections (mean, exponential, best_distribution, prophet, kde) are commented out.
 done
 
 echo "All runs completed successfully!"
