@@ -42,6 +42,8 @@ class Evaluation:
             Evaluation metric to use, e.g., 'CADD' or 'day' (default is 'CADD').
         method_types : str, optional
             Type of methods to evaluate ('raw' or 'prob', default is 'raw').
+        methods : list, optional
+            Specific methods to evaluate. If not specified, all methods for the given method_type will be used.
 
         Attributes
         ----------
@@ -49,12 +51,12 @@ class Evaluation:
             Root directory of the project.
         simulations_path : str
             Path to the simulations data directory.
-        dataset_name_* : list
-            Lists to store dataset names by evaluation method.
-        test_* : list
-            Lists to store test data by evaluation method.
-        sim_* : list
-            Lists to store simulation data by evaluation method.
+        dataset_names : dict
+            Dictionary to store dataset names by evaluation method.
+        test_data : dict
+            Dictionary to store test data by evaluation method.
+        sim_data : dict
+            Dictionary to store simulation data by evaluation method.
         data_drawn : bool
             Indicates if simulation data has been processed.
 
@@ -73,23 +75,34 @@ class Evaluation:
         highlight_min(s)
             Highlights the minimum value in a DataFrame row.
     """
-    def __init__(self, save_path = None, total_runs = 1, metric = 'CADD', method_types = 'raw'):
-        self.root_dir = os.path.abspath(os.path.join(os.getcwd(), ".."))
+    def __init__(self, save_path = None, total_runs = 1, metric = 'CADD', method_types = 'raw', methods=None):
+        self.root_dir = os.path.abspath(os.path.join(os.getcwd(),))
         if self.root_dir not in sys.path:
             sys.path.append(self.root_dir)
         self.simulations_path = os.path.join(self.root_dir, 'event_log_simulations')
         self.save_path = save_path
 
-        self.dataset_name_expon, self.test_expon, self.sim_expon = [], [], []
-        self.dataset_name_mean, self.test_mean, self.sim_mean = [], [], []
-        self.dataset_name_prophet, self.test_prophet, self.sim_prophet = [], [], []
-        self.dataset_name_baseline, self.test_baseline, self.sim_baseline = [], [], []
-        self.dataset_name_kde, self.test_kde, self.sim_kde = [], [], []
-        self.dataset_name_npp, self.test_npp, self.sim_npp = [], [], []
+        # Define available methods for each type
+        self.available_methods = {
+            'raw': ['mean', 'exponential', 'best_distribution', 'npp', 'kde'],
+            'prob': ['mean_prob', 'exponential_prob', 'best_distribution_prob', 'prophet', 'kde_prob', 'lstm', 'chronos', 'xgboost', 'npp_prob']
+        }
+
+        # Initialize method lists based on user input or defaults
+        self.methods = methods if methods else self.available_methods[method_types]
+        
+        # Validate methods
+        invalid_methods = [m for m in self.methods if m not in self.available_methods[method_types]]
+        if invalid_methods:
+            raise ValueError(f"Invalid methods for {method_types}: {invalid_methods}. Available methods are: {self.available_methods[method_types]}")
+
+        # Initialize data storage for each method
+        self.dataset_names = {method: [] for method in self.methods}
+        self.test_data = {method: [] for method in self.methods}
+        self.sim_data = {method: [] for method in self.methods}
 
         self.method_types = method_types
-        self.data_drawn = False #draw_simulated_n_true_data needs to be called prior to any other operation 
-        
+        self.data_drawn = False
         self.total_runs = total_runs
         self.metric = metric
 
@@ -101,79 +114,26 @@ class Evaluation:
         return sim_data
         
     def draw_simulated_n_true_data(self, eval_interarrivals=False):
-        model_count = 6  # number of models, expon, baseline, etc..
         results_dict = {}
+        progress_bar = tqdm(total=len(self.methods), desc='Drawing results from simulated data..', position=0)
 
-        progress_bar = tqdm(total=model_count, desc='Drawing results from simulated data..', position=0)
-
-        if self.method_types == 'raw':
-            folders = ['mean', 'exponential', 'best_distribution','npp', 'kde']
-        elif self.method_types == 'prob':
-            folders = ['mean_prob', 'exponential_prob', 'best_distribution_prob', 'prophet','npp_prob', 'kde_prob']
-        # iterate over each subfolder in the base directory
-        for folder in folders:
-            folder_path = os.path.join(self.simulations_path, folder)
+        # iterate over each selected method
+        for method in self.methods:
+            folder_path = os.path.join(self.simulations_path, method)
             for subfolder in os.listdir(folder_path):
                 print(f'current dataset: {subfolder}')
                 subfolder_path = os.path.join(folder_path, subfolder)
 
-                if self.method_types == 'raw':
-                    if folder == 'best_distribution' and subfolder not in self.dataset_name_baseline:
-                        self.dataset_name_baseline.append(subfolder)
-                    elif folder == 'exponential' and subfolder not in self.dataset_name_expon:
-                        self.dataset_name_expon.append(subfolder)
-                    elif folder == 'mean' and subfolder not in self.dataset_name_mean:
-                        self.dataset_name_mean.append(subfolder)
-                    elif folder == 'kde' and subfolder not in self.dataset_name_kde:
-                        self.dataset_name_kde.append(subfolder)
-                    elif folder == 'npp' and subfolder not in self.dataset_name_npp:
-                        self.dataset_name_npp.append(subfolder)
-                elif self.method_types == 'prob':
-                    if folder == 'best_distribution_prob' and subfolder not in self.dataset_name_baseline:
-                        self.dataset_name_baseline.append(subfolder)
-                    elif folder == 'exponential_prob' and subfolder not in self.dataset_name_expon:
-                        self.dataset_name_expon.append(subfolder)
-                    elif folder == 'mean_prob' and subfolder not in self.dataset_name_mean:
-                        self.dataset_name_mean.append(subfolder)
-                    elif folder == 'prophet' and subfolder not in self.dataset_name_prophet:
-                        self.dataset_name_prophet.append(subfolder)
-                    elif folder == 'kde_prob' and subfolder not in self.dataset_name_kde:
-                        self.dataset_name_kde.append(subfolder)
-                    elif folder == 'npp_prob' and subfolder not in self.dataset_name_npp:
-                        self.dataset_name_npp.append(subfolder)
-                #check if the path is a directory
+                if subfolder not in self.dataset_names[method]:
+                    self.dataset_names[method].append(subfolder)
+
                 if os.path.isdir(subfolder_path):
                     if subfolder not in results_dict:
                         results_dict[subfolder] = {}
 
-                    # test data is constant across all runs, so calculate once only
                     test_path = os.path.join(subfolder_path, 'test.json')
                     test_data = read_json(test_path)
-
-                    if self.method_types == 'raw':
-                        if folder == 'best_distribution':
-                            self.test_baseline.append(test_data)
-                        elif folder == 'kde':
-                            self.test_kde.append(test_data)
-                        elif folder == 'npp':
-                            self.test_npp.append(test_data)
-                        elif folder == 'exponential':
-                            self.test_expon.append(test_data)
-                        elif folder == 'mean':
-                            self.test_mean.append(test_data)
-                    elif self.method_types == 'prob':
-                        if folder == 'best_distribution_prob':
-                            self.test_baseline.append(test_data)
-                        elif folder == 'kde_prob':
-                            self.test_kde.append(test_data)
-                        elif folder == 'npp_prob':
-                            self.test_npp.append(test_data)
-                        elif folder == 'exponential_prob':
-                            self.test_expon.append(test_data)
-                        elif folder == 'mean_prob':
-                            self.test_mean.append(test_data)
-                        elif folder == 'prophet':
-                            self.test_prophet.append(test_data)
+                    self.test_data[method].append(test_data)
 
                     test_data_series = pd.Series(test_data.copy())
                     test_data_dt = pd.to_datetime(test_data_series, format="%d.%m.%Y %H:%M:%S")
@@ -185,30 +145,37 @@ class Evaluation:
                         sim_data = self.get_sim_data(subfolder_path, run)
                         if run == representative_simulation_index:
                             if self.method_types == 'raw':
-                                if folder == 'best_distribution':
-                                    self.sim_baseline.append(sim_data)
-                                elif folder == 'kde':
-                                    self.sim_kde.append(sim_data)
+                                if method == 'best_distribution':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'kde':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'exponential':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'mean':
+                                    self.sim_data[method].append(sim_data)
                                 elif folder == 'npp':
-                                    self.sim_npp.append(sim_data)
-                                elif folder == 'exponential':
-                                    self.sim_expon.append(sim_data)
-                                elif folder == 'mean':
-                                    self.sim_mean.append(sim_data)
-
+                                    self.test_npp.append(test_data)
+                            
                             elif self.method_types == 'prob':
-                                if folder == 'best_distribution_prob':
-                                    self.sim_baseline.append(sim_data)
-                                elif folder == 'kde_prob':
-                                    self.sim_kde.append(sim_data)
-                                elif folder == 'npp_prob':
-                                    self.sim_npp.append(sim_data)
-                                elif folder == 'exponential_prob':
-                                    self.sim_expon.append(sim_data)
-                                elif folder == 'mean_prob':
-                                    self.sim_mean.append(sim_data)
-                                elif folder == 'prophet':
-                                    self.sim_prophet.append(sim_data)
+                                if method == 'best_distribution_prob':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'kde_prob':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'exponential_prob':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'mean_prob':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'prophet':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'chronos':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'lstm':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'xgboost':
+                                    self.sim_data[method].append(sim_data)
+                                elif method == 'npp_prob':
+                                    self.sim_data[method].append(sim_data)
+                                
 
                         # transform string to datetime
                         sim_data_series = pd.Series(sim_data.copy())
@@ -319,7 +286,8 @@ class Evaluation:
                             distance = case_arrival_distribution_distance_custom(
                                 original_arrival_times=test_data_for_distance,
                                 simulated_arrival_times=sim_data_for_distance,
-                                bin=bin
+                                bin=bin,
+                                normalize=False,
                             )
                             distances[f'run_{run}'] = distance
                         print('calculations complete.\n')
@@ -328,11 +296,11 @@ class Evaluation:
                     mean_dist = np.mean([d for d in distances.values()])
                     std_dist = np.std([d for d in distances.values()])
 
-                    results_dict[subfolder][folder] = {
+                    results_dict[subfolder][method] = {
                         'mean': np.round(mean_dist, 4),
                         'std': np.round(std_dist, 4)
                     }
-                    progress_bar.update(1)
+                progress_bar.update(1)
         progress_bar.close()
         self.data_drawn = True
 
@@ -347,84 +315,32 @@ class Evaluation:
         rows = []
         mean_rows = []  # To hold only mean values for evaluation
 
-        if self.method_types == 'raw':
-            for dataset, values in results_dict.items():
-                formatted_mean = f"{values['mean']['mean']} ({values['mean']['std']})"
-                formatted_exponential = f"{values['exponential']['mean']} ({values['exponential']['std']})"
-                formatted_baseline = f"{values['best_distribution']['mean']} ({values['best_distribution']['std']})"
-                # formatted_prophet = f"{values['prophet']['mean']} ({values['prophet']['std']})"
-                formatted_kde = f"{values['kde']['mean']} ({values['kde']['std']})"
-                formatted_npp = f"{values['npp']['mean']} ({values['npp']['std']})"
-                # formatted_kde_prob = f"{values['kde_prob']['mean']} ({values['kde_prob']['std']})"
+        for dataset, values in results_dict.items():
+            row_data = {'dataset': dataset}
+            mean_row_data = {'dataset': dataset}
 
-                row_data = {
-                    'dataset': dataset,
-                    'mean': formatted_mean,
-                    'exponential': formatted_exponential,
-                    'best_distribution': formatted_baseline,
-                    # 'prophet': formatted_prophet,
-                    'kde': formatted_kde,
-                    'npp': formatted_npp,
-                    # 'kde_prob': formatted_kde_prob,
-                }
-                mean_row_data = {
-                    'dataset': dataset,
-                    'mean': values['mean']['mean'],
-                    'exponential': values['exponential']['mean'],
-                    'best_distribution': values['best_distribution']['mean'],
-                    # 'prophet': values['prophet']['mean'],
-                    'kde': values['kde']['mean'],
-                    'npp': values['npp']['mean'],
-                    # 'kde_prob': values['kde_prob']['mean'],
-                }
-                rows.append(row_data)
-                mean_rows.append(mean_row_data)
-        elif self.method_types == 'prob':
-            for dataset, values in results_dict.items():
-                formatted_mean = f"{values['mean_prob']['mean']} ({values['mean_prob']['std']})"
-                formatted_exponential = f"{values['exponential_prob']['mean']} ({values['exponential_prob']['std']})"
-                formatted_baseline = f"{values['best_distribution_prob']['mean']} ({values['best_distribution_prob']['std']})"
-                formatted_prophet = f"{values['prophet']['mean']} ({values['prophet']['std']})"
-                formatted_kde = f"{values['kde_prob']['mean']} ({values['kde_prob']['std']})"
-                formatted_npp = f"{values['npp_prob']['mean']} ({values['npp_prob']['std']})"
-                # formatted_kde_prob = f"{values['kde_prob']['mean']} ({values['kde_prob']['std']})"
+            # Add data for each method that was provided
+            for method in self.methods:
+                if method in values:  # Check if method exists in results
+                    formatted_value = f"{values[method]['mean']} ({values[method]['std']})"
+                    row_data[method] = formatted_value
+                    mean_row_data[method] = values[method]['mean']
 
-                row_data = {
-                    'dataset': dataset,
-                    'mean_prob': formatted_mean,
-                    'exponential_prob': formatted_exponential,
-                    'best_distribution_prob': formatted_baseline,
-                    'prophet': formatted_prophet,
-                    'kde_prob': formatted_kde,
-                    'npp_prob': formatted_npp,
-                    # 'kde_prob': formatted_kde_prob,
-                }
-                mean_row_data = {
-                    'dataset': dataset,
-                    'mean_prob': values['mean_prob']['mean'],
-                    'exponential_prob': values['exponential_prob']['mean'],
-                    'best_distribution_prob': values['best_distribution_prob']['mean'],
-                    'prophet': values['prophet']['mean'],
-                    'kde_prob': values['kde_prob']['mean'],
-                    'npp_prob': values['npp_prob']['mean'],
-                    # 'kde_prob': values['kde_prob']['mean'],
-                }
-                rows.append(row_data)
-                mean_rows.append(mean_row_data)
+            rows.append(row_data)
+            mean_rows.append(mean_row_data)
 
         df = pd.DataFrame(rows)
         mean_df = pd.DataFrame(mean_rows)  #this df is used for min calculations
 
         print('\nDisplaying top-performing simulation approaches..')
         print(df)
+        
+        # Find minimum values for each dataset
         for index, row in mean_df.iterrows():
             dataset_entry = row['dataset']
-
-            if self.method_types == 'raw':
-                min_column = row[['mean', 'exponential', 'best_distribution','npp', 'kde']].idxmin()
-            elif self.method_types == 'prob':
-                min_column = row[['mean_prob', 'exponential_prob', 'best_distribution_prob', 'prophet','npp_prob', 'kde_prob']].idxmin()
-
+            # Get all columns except 'dataset' for finding minimum
+            method_columns = [col for col in mean_df.columns if col != 'dataset']
+            min_column = row[method_columns].idxmin()
             min_value = row[min_column]
             print(f"Dataset Entry: {dataset_entry}, Minimum Value: {min_value}, Respective Column: {min_column}")
 
@@ -448,111 +364,100 @@ class Evaluation:
                 min_col_index = header_row[min_col_name]  # get the Excel index
                 row[min_col_index - 1].fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type="solid")  # apply the fill
 
-            if self.metric == 'CADD':
-                if self.method_types == 'raw':
-                    fn = 'performance_overview_simulations_CADD_raw.xlsx'
-                elif self.method_types == 'prob':
-                    fn = 'performance_overview_simulations_CADD_prob.xlsx'
-            elif self.metric == 'day':
-                if self.method_types == 'raw':
-                    fn = 'performance_overview_simulations_day_raw.xlsx'
-                elif self.method_types == 'prob':
-                    fn = 'performance_overview_simulations_day_prob.xlsx'
+            # Create filename based on metric and method_types
+            fn = f'performance_overview_simulations_{self.metric}_{self.method_types}.xlsx'
             wb.save(os.path.join(file_path, fn))
             print('Complete.\n')
 
-    def visualize_datetime_lists(self):
-        """
-        Function to visualize each list of datetime strings separately in one plot using plt.bar.
-        """
-        if self.data_drawn == False:
-            raise ValueError('Data needs to be drawn from simulations before evaluations can take place.')
+    # def visualize_datetime_lists(self):
+    #     """
+    #     Function to visualize each list of datetime strings separately in one plot using plt.bar.
+    #     """
+    #     if self.data_drawn == False:
+    #         raise ValueError('Data needs to be drawn from simulations before evaluations can take place.')
 
-        num_datasets = len(self.dataset_name_baseline)
-        num_columns = 5  # Needs to be equal to the number of axes
+    #     num_datasets = len(self.dataset_names['best_distribution'])
+    #     num_columns = 5  # Needs to be equal to the number of axes
 
-        # Increase figure size: Width x Height (in inches)
-        fig, ax = plt.subplots(num_datasets, num_columns, figsize=(num_columns * 8, num_datasets * 6))
+    #     # Increase figure size: Width x Height (in inches)
+    #     fig, ax = plt.subplots(num_datasets, num_columns, figsize=(num_columns * 8, num_datasets * 6))
 
-        # If there's only one dataset, ax might not be a 2D array
-        if num_datasets == 1:
-            ax = np.array([ax])
+    #     # If there's only one dataset, ax might not be a 2D array
+    #     if num_datasets == 1:
+    #         ax = np.array([ax])
 
-        # Iterate over each dataset
-        for i in range(num_datasets):
-            df_test = self.get_date_frequency_df(self.test_baseline[i])
-            df_mean = self.get_date_frequency_df(self.sim_mean[i])
-            df_base = self.get_date_frequency_df(self.sim_baseline[i])
-            df_prophet = self.get_date_frequency_df(self.sim_prophet[i])
-            df_kde = self.get_date_frequency_df(self.sim_kde[i])
-            df_npp = self.get_date_frequency_df(self.sim_npp[i])
+    #     # Iterate over each dataset
+    #     for i in range(num_datasets):
+    #         df_test = self.get_date_frequency_df(self.test_data['best_distribution'][i])
+    #         df_mean = self.get_date_frequency_df(self.sim_data['best_distribution'][i])
+    #         df_base = self.get_date_frequency_df(self.sim_data['best_distribution'][i])
+    #         df_prophet = self.get_date_frequency_df(self.sim_data['prophet'][i])
+    #         df_kde = self.get_date_frequency_df(self.sim_data['kde'][i])
 
-            # Plotting
-            ax[i, 0].bar(df_test['date'], df_test['occurrences'], width=0.8, align='center', color='skyblue')
-            ax[i, 1].bar(df_mean['date'], df_mean['occurrences'], width=0.8, align='center', color='skyblue')
-            ax[i, 2].bar(df_base['date'], df_base['occurrences'], width=0.8, align='center', color='skyblue')
-            ax[i, 3].bar(df_prophet['date'], df_prophet['occurrences'], width=0.8, align='center', color='skyblue')
-            ax[i, 4].bar(df_npp['date'], df_npp['occurrences'], width=0.8, align='center', color='skyblue')
-            ax[i, 5].bar(df_kde['date'], df_kde['occurrences'], width=0.8, align='center', color='skyblue')
+    #         # Plotting
+    #         ax[i, 0].bar(df_test['date'], df_test['occurrences'], width=0.8, align='center', color='skyblue')
+    #         ax[i, 1].bar(df_mean['date'], df_mean['occurrences'], width=0.8, align='center', color='skyblue')
+    #         ax[i, 2].bar(df_base['date'], df_base['occurrences'], width=0.8, align='center', color='skyblue')
+    #         ax[i, 3].bar(df_prophet['date'], df_prophet['occurrences'], width=0.8, align='center', color='skyblue')
+    #         ax[i, 4].bar(df_kde['date'], df_kde['occurrences'], width=0.8, align='center', color='skyblue')
 
-            # Add titles to each subplot
-            ax[i, 0].set_title(f'{self.dataset_name_baseline[i]} - Test', fontsize=14)
-            ax[i, 1].set_title(f'{self.dataset_name_baseline[i]} - Simulated Mean', fontsize=14)
-            ax[i, 2].set_title(f'{self.dataset_name_baseline[i]} - Simulated Baseline', fontsize=14)
-            ax[i, 3].set_title(f'{self.dataset_name_baseline[i]} - Simulated Prophet', fontsize=14)
-            ax[i, 5].set_title(f'{self.dataset_name_baseline[i]} - Simulated NPP', fontsize=14)
-            ax[i, 4].set_title(f'{self.dataset_name_baseline[i]} - Simulated KDE', fontsize=14)
+    #         # Add titles to each subplot
+    #         ax[i, 0].set_title(f'{self.dataset_names["best_distribution"][i]} - Test', fontsize=14)
+    #         ax[i, 1].set_title(f'{self.dataset_names["best_distribution"][i]} - Simulated Mean', fontsize=14)
+    #         ax[i, 2].set_title(f'{self.dataset_names["best_distribution"][i]} - Simulated Baseline', fontsize=14)
+    #         ax[i, 3].set_title(f'{self.dataset_names["best_distribution"][i]} - Simulated Prophet', fontsize=14)
+    #         ax[i, 4].set_title(f'{self.dataset_names["best_distribution"][i]} - Simulated KDE', fontsize=14)
 
-            # Get the date range from df_test
-            min_date = df_test['date'].min()
-            max_date = df_test['date'].max()
+    #         # Get the date range from df_test
+    #         min_date = df_test['date'].min()
+    #         max_date = df_test['date'].max()
 
-            # Get the maximum occurrence from df_test and add a margin
-            max_occurrence = df_test['occurrences'].max()
-            y_max = max_occurrence * 1.2  # Adding a 20% margin
+    #         # Get the maximum occurrence from df_test and add a margin
+    #         max_occurrence = df_test['occurrences'].max()
+    #         y_max = max_occurrence * 1.2  # Adding a 20% margin
 
-            # Set x-axis and y-axis limits, adjust ticks
-            for a in ax[i]:
-                # Set x-axis limits
-                a.set_xlim([min_date, max_date])
+    #         # Set x-axis and y-axis limits, adjust ticks
+    #         for a in ax[i]:
+    #             # Set x-axis limits
+    #             a.set_xlim([min_date, max_date])
 
-                # Set y-axis limits
-                a.set_ylim([0, y_max])
+    #             # Set y-axis limits
+    #             a.set_ylim([0, y_max])
 
-                # Rotate x-ticks and format dates
-                a.tick_params(axis='x', labelrotation=45)
-                a.xaxis.set_major_locator(plt.MaxNLocator(10))
-                a.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-                a.set_xlabel('Date', fontsize=12)
-                a.set_ylabel('Occurrences', fontsize=12)
+    #             # Rotate x-ticks and format dates
+    #             a.tick_params(axis='x', labelrotation=45)
+    #             a.xaxis.set_major_locator(plt.MaxNLocator(10))
+    #             a.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    #             a.set_xlabel('Date', fontsize=12)
+    #             a.set_ylabel('Occurrences', fontsize=12)
 
-        # Adjust layout to prevent overlap
-        plt.tight_layout()
+    #     # Adjust layout to prevent overlap
+    #     plt.tight_layout()
 
-        if self.save_path is not None:
-            file_path = os.path.join(self.save_path, 'performance_overview_simulations.jpeg')
-            print(f'Save visualization of performances to {file_path}...')
-            plt.savefig(file_path, dpi=200, bbox_inches='tight')  # dpi adjusts resolution
-            plt.close()
-            print(f'Complete.\n')
-        else:
-            plt.show()
+    #     if self.save_path is not None:
+    #         file_path = os.path.join(self.save_path, 'performance_overview_simulations.jpeg')
+    #         print(f'Save visualization of performances to {file_path}...')
+    #         plt.savefig(file_path, dpi=200, bbox_inches='tight')  # dpi adjusts resolution
+    #         plt.close()
+    #         print(f'Complete.\n')
+    #     else:
+    #         plt.show()
 
-    def get_date_frequency_df(self, times):
-        timestamps = pd.to_datetime(times, format="%d.%m.%Y %H:%M:%S")
-        # Extract dates without time
-        timestamps_series = pd.Series(timestamps)
-        dates = timestamps_series.dt.date
-        # Count occurrences of each date
-        date_counts = dates.value_counts().sort_index()
-        df = pd.DataFrame({'date': date_counts.index, 'occurrences': date_counts.values})
-        return df   
+    # def get_date_frequency_df(self, times):
+    #     timestamps = pd.to_datetime(times, format="%d.%m.%Y %H:%M:%S")
+    #     # Extract dates without time
+    #     timestamps_series = pd.Series(timestamps)
+    #     dates = timestamps_series.dt.date
+    #     # Count occurrences of each date
+    #     date_counts = dates.value_counts().sort_index()
+    #     df = pd.DataFrame({'date': date_counts.index, 'occurrences': date_counts.values})
+    #     return df   
     
-    def highlight_min(self, s):
-        # Function to highlight the minimum value in each row
-        # Create a boolean mask for the minimum values
-        is_min = s == s.min()
-        return ['background-color: green' if v else '' for v in is_min]
+    # def highlight_min(self, s):
+    #     # Function to highlight the minimum value in each row
+    #     # Create a boolean mask for the minimum values
+    #     is_min = s == s.min()
+    #     return ['background-color: green' if v else '' for v in is_min]
     
     
 #python eval_event_logs.py --res_dir=results
@@ -562,6 +467,7 @@ if __name__ == '__main__':
     parser.add_argument('--total_runs', type=int, default=1, help='Amount of runs to be considered. Necessary for robust result construction.')
     parser.add_argument('--metric', type=str, default='CADD', help='Metric for evaluation.')
     parser.add_argument('--method_types', type=str, default='prob', help='If we evaluate the raw or prob methods.')
+    parser.add_argument('--methods', nargs='+', help='Specific methods to evaluate. If not specified, all methods for the given method_type will be used.')
     args = parser.parse_args()
 
     save_path = os.path.join(os.getcwd(), args.res_dir)
@@ -569,11 +475,11 @@ if __name__ == '__main__':
     if not os.path.isdir(save_path):
         os.mkdir(save_path)
         
-    eval_class = Evaluation(save_path, args.total_runs, args.metric, args.method_types)
+    eval_class = Evaluation(save_path, args.total_runs, args.metric, args.method_types, args.methods)
     
     results_dict = eval_class.draw_simulated_n_true_data()
     
     eval_class.evaluate_model_performance(results_dict)
     
     # if args.metric == 'CADD':
-    eval_class.visualize_datetime_lists()
+    # eval_class.visualize_datetime_lists()
