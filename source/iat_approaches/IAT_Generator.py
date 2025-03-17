@@ -4,20 +4,23 @@ import numpy as np
 from source.iat_approaches.PDF import PDFIATGenerator
 from source.iat_approaches.prophet_ import ProphetIATGenerator
 from source.iat_approaches.kde import KDEIATGenerator
-from source.iat_approaches.npp import NPPIATGenerator
 from source.arrival_distribution import DurationDistribution
+from source.iat_approaches.lstm import LSTM_IAT_Generator
+from source.iat_approaches.chronos import ChronosIATGenerator
+from source.iat_approaches.xgboost import XGBoostIATGenerator
+from source.iat_approaches.npp import NPPIATGenerator
 
 class IAT_Generator():
     """
     This class selects the according IAT generator method 
     """
 
-    def __init__(self, method, prob_day, train_arrival_times, inter_arrival_durations, data_n_seqs, kwargs) -> None:
+    def __init__(self, method, prob_day, train_arrival_times, inter_arrival_durations, data_n_seqs, kwargs, seed) -> None:
         self.train_arrival_times = train_arrival_times
         self.inter_arrival_durations = inter_arrival_durations
         self.data_n_seqs = data_n_seqs
         self.prob_day = prob_day
-
+        self.seed = seed
         self._get_generator(method = method, kwargs = kwargs)
 
     def generate(self, start_time):
@@ -79,6 +82,12 @@ class IAT_Generator():
                                             probabilistic_day=self.prob_day,
                                             kwargs = kwargs
                                             )
+        elif method == 'lstm':
+            self.generator = LSTM_IAT_Generator(self.train_arrival_times, self.data_n_seqs, inter_arrival_durations=self.inter_arrival_durations,)
+        elif method == 'chronos':
+            self.generator = ChronosIATGenerator(self.train_arrival_times, self.data_n_seqs)
+        elif method == 'xgboost':
+            self.generator = XGBoostIATGenerator(self.train_arrival_times, self.data_n_seqs, seed=self.seed)
         # elif method == 'kde_prob':
         #     arrival_likelihood = True
         #     # probabilistic = True
