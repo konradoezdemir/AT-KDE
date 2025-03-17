@@ -92,3 +92,5 @@ cd run_shells
 ./run_all.ps1 #for windows 
 sh run_all.sh #for linux/mac
 ```
+## Appendix 
+![](https://github.com/konradoezdemir/AT-KDE/blob/main/BPM2025__Inter_arrival_times_appendix.png)
