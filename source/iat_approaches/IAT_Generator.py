@@ -4,6 +4,7 @@ import numpy as np
 from source.iat_approaches.PDF import PDFIATGenerator
 from source.iat_approaches.prophet_ import ProphetIATGenerator
 from source.iat_approaches.kde import KDEIATGenerator
+from source.iat_approaches.npp import NPPIATGenerator
 from source.arrival_distribution import DurationDistribution
 
 class IAT_Generator():
@@ -59,7 +60,16 @@ class IAT_Generator():
                                             kwargs = kwargs
                                             )
         elif method == 'prophet':
-            self.generator = ProphetIATGenerator(self.train_arrival_times, data_n_seqs = self.data_n_seqs)
+            self.generator = ProphetIATGenerator(
+                                                self.train_arrival_times, 
+                                                data_n_seqs = self.data_n_seqs
+                                                )
+        elif method == 'npp':
+            self.generator = NPPIATGenerator(
+                                                self.train_arrival_times, 
+                                                data_n_seqs = self.data_n_seqs,
+                                                probabilistic_day=self.prob_day
+                                            )
         elif method == 'kde':
             arrival_likelihood = None
             # probabilistic = False
