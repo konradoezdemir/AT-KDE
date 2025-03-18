@@ -92,3 +92,5 @@ sh run_all.sh #for linux/mac
 ```
 ## Appendix 
 ![](https://github.com/konradoezdemir/AT-KDE/blob/main/BPM2025__Inter_arrival_times_appendix.png)
+
+![](https://github.com/konradoezdemir/AT-KDE/blob/main/BPM2025__Inter_arrival_times_exectime.png)
