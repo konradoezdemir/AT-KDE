@@ -1,6 +1,5 @@
 import pandas as pd 
-# import numpy as np
-# from datetime import datetime, timedelta
+from datetime import datetime, timedelta
 import argparse
 import warnings
 import os
@@ -21,6 +20,8 @@ def parse_arguments():
     parser.add_argument('--prob_day', type=str, default='True', help='If the method should probabilistically consider non-working days')
     parser.add_argument('--run', type=int, default=1, help='current run index - necessary for robust result construction')
     parser.add_argument('--seed', type=int, default=0, help='seed for the xgboost model')
+    parser.add_argument('--start_date', type=str, default="start_test", help='set the start date for simulation period (%Y-%m-%d), if empty (default), resort to last train date')
+    parser.add_argument('--end_date', type=str, default="end_test", help='set the end date for simulation period (%Y-%m-%d), if empty (default), resort to last test date')
     parser.add_argument('--kwargs', nargs='*', action=KwargsAction, default={}, help='Method-specific parameters as key=value pairs.')
     args = parser.parse_args()
 
@@ -81,10 +82,15 @@ def get_inter_arrival_times_from_list_of_timestamps(arrival_times):
 
     return inter_arrival_durations
 
-
-def store_data(event_log_data, case_arrival_times, test, train, args):
-    print(f"Number of simulated arrivals: {len(case_arrival_times)}")
-    print(f"Number of test arrivals: {len(test)}")
+def store_data(case_arrival_times, start_time, end_time, train, test, args, logger):
+    full_dataset = train + test 
+    idx = pd.to_datetime(full_dataset, format = '%d.%m.%Y %H:%M:%S')
+    start = pd.Timestamp(start_time)
+    end   = pd.Timestamp(end_time)
+    sim_period = idx[(idx >= start) & (idx < end)]
+    
+    logger.info(f"Number of simulated arrivals: {len(case_arrival_times)}")
+    logger.info(f"Number of reference arrivals: {len(sim_period)}")
 
     if 'float_format' in args.kwargs and args.kwargs['float_format'] == 'True' and args.kwargs['tpp_data'] == 'True': #akin to only relevant for compensator calc
         n = int(args.kwargs['n_seqs'])
@@ -142,21 +148,7 @@ if __name__ == "__main__":
     method = args.method
     prob_day = args.prob_day #bool
 
-    if args.input_type == 'list':
-        event_log_data = False
-        path = f"{os.path.join(os.getcwd(), 'synthetic_data', 'datasets', args.dataset)}.json"
-        data = read_data(path)
-        if type(data[0]) != str: # get floats and transform them into timestamps
-            list_of_timestamps = transform_to_timestamp(data)
-        else:
-            list_of_timestamps = data
-    elif args.input_type == 'scenario':
-        event_log_data = False
-        path = f"{os.path.join(os.getcwd(), 'synthetic_data', 'scenario_data', 'dataset', args.dataset)}.json"
-        data = read_data(path)[0]
-        # transform to list of timestamps
-        list_of_timestamps = [pd.to_datetime(timestamp) for timestamp in data]
-    elif args.input_type == 'event_log': # extract case arrival timestamps from event log and transform to list
+    if args.input_type == 'event_log': # extract case arrival timestamps from event log and transform to list
         event_log_data = True
         current_dir = os.getcwd()
         data_dir = f"{os.path.join(current_dir, 'data', 'event_logs', args.dataset)}.csv"
@@ -167,33 +159,51 @@ if __name__ == "__main__":
             TS = 'end_timestamp'
         event_log[TS] = pd.to_datetime(event_log[TS], utc=True, format='mixed')
         list_of_timestamps = get_arrival_times(event_log, TS)
+        
+    #temporal split needs to take place regardless of start time due to downstream tasks etc.
+    train, test = split_arrival_times(list_of_timestamps) #returns sorted lists of timestamps
+    # cvs_pharmacy
+    # earliest_date train: 2019-03-25
+    # latest_date train: 2019-05-14
+    # earliest_date test: 2019-05-14
+    # latest_date test: 2019-05-27
 
-    train, test = split_arrival_times(list_of_timestamps)
     inter_arrival_durations = get_inter_arrival_times_from_list_of_timestamps(arrival_times=train)
-    # num_instances = len(test)
-    start_time = test[0]
-    
-    # get number of to be simulated sequences (only relevant for KDE)
-    test_datetimes = pd.to_datetime(test)
-    unique_dates = test_datetimes.date
-    earliest_date = test_datetimes.min().date()
-    latest_date = test_datetimes.max().date()
-    data_n_seqs = (latest_date - earliest_date).days + 1
-    print(f'Requested n_seqs: {data_n_seqs}')
 
+    if args.start_date is not None and args.end_date is not None:
+        if args.start_date == 'train_start' and args.end_date == 'train_end':
+            #default mode to simulate the set-out train period
+            mode = 'full train'
+            start_time = train[0]
+            end_time = train[-1]
+        elif args.start_date == 'test_start' and args.end_date == 'test_end':
+            #default mode to simulate the set-out test period
+            mode = 'full test'
+            start_time = test[0]
+            end_time = test[-1]
+        else:
+            mode = 'custom specified'
+            try: 
+                start_time = datetime.strptime(args.start_date, '%Y-%m-%d')
+                end_time = datetime.strptime(args.end_date, '%Y-%m-%d')
+            except Exception as e:
+                logger.info(f'Simulation period could not be inferred correctly: {e}')
+                
+    earliest_date = start_time.date()
+    latest_date = end_time.date()
+    logger.info(f'Simulation of {mode} data enabled. earliest_date of sim: {earliest_date}, latest_date of sim:{latest_date}')
     # define generator
     generator = IAT_Generator(
                                 method=method, 
                                 prob_day=prob_day,
                                 train_arrival_times=train, 
-                                inter_arrival_durations=inter_arrival_durations, 
-                                data_n_seqs=data_n_seqs, 
-                                kwargs = args.kwargs,
-                                seed = args.seed
+                                inter_arrival_durations=inter_arrival_durations,
+                                seed = args.seed,
+                                kwargs = args.kwargs
                             )
 
     # generate arrivals
-    case_arrival_times = generator.generate(start_time=start_time)
+    case_arrival_times = generator.generate(start_time=start_time, end_time=end_time)
 
     if 'float_format' in args.kwargs:
         if args.kwargs['float_format'] == 'True':
@@ -202,4 +212,4 @@ if __name__ == "__main__":
             if 'kde' not in args.method:
                 case_arrival_times = transform_to_float(case_arrival_times)
             
-    store_data(event_log_data, case_arrival_times, test, train, args)
+    store_data(case_arrival_times, start_time, end_time, train, test, args, logger)

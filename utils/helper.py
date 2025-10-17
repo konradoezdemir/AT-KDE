@@ -80,7 +80,6 @@ def transform_to_float(arrival_times):
     grouped_timestamps_floats : list of lists
         List of lists where each sublist contains time floats for a specific date.
     """
-
     # Ensure all timestamps are timezone-aware and in UTC
     arrival_times = [
         ts.tz_convert('UTC') if ts.tzinfo else ts.tz_localize('UTC')

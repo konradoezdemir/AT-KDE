@@ -37,9 +37,9 @@ class DataSimulator:
             Domain name for logging or metadata (default is None).
         reference_data_lengths : dict, optional
             Dictionary of segment lengths in the reference dataset (default is None).
-        train_segmented : dict, optional
+        train_clustered : dict, optional
             Segmented training data by clusters or other criteria (default is None).
-        test_segment_estim : pandas.DataFrame, optional
+        test_cluster_estim : pandas.DataFrame, optional
             DataFrame containing test data and predicted clusters (default is None).
         path : bool, optional
             Indicates whether to save intermediate results (default is False).
@@ -75,19 +75,20 @@ class DataSimulator:
             Samples interarrival times for a specific cluster and bin.
     """
     
-    def __init__(self, reference_dataset, domain = None, reference_data_lengths=None, train_segmented = None, test_segment_estim = None, path=False, bw_smooth_factor=None, bin_size_hours=3):
-        # Setup logging
+    def __init__(self, reference_dataset, domain = None, reference_data_lengths=None, train_clustered = None, test_cluster_estim = None, path=False, bw_smooth_factor=None, bin_size_hours=3):
         logging.basicConfig(level=logging.INFO, format='%(filename)s - %(message)s')
         self.logger = logging.getLogger(__name__)
         
-        self.ref_data = reference_dataset.copy()
-        # self.printer_index = 0
-        self.train_segmented = train_segmented
-        self.test_segment_estim = copy.deepcopy(test_segment_estim)
-        self.test_segment_estim['date'] = self.test_segment_estim['date'].dt.date #remove redundant hrs:mins:sec in each date indication
-        self.test_segment_estim.set_index('date', inplace = True)
+        self.ref_data = reference_dataset.copy() #train
+        self.ref_data['date'] = pd.to_datetime(self.ref_data['date'])
+        
+        self.train_clustered = train_clustered
+        
+        self.test_cluster_estim = copy.deepcopy(test_cluster_estim)
+        self.test_cluster_estim['date'] = pd.to_datetime(self.test_cluster_estim['date'])
+        self.test_cluster_estim.set_index('date', inplace = True)
+        
         self.diffed_kernel_std_dict, self.diffed_data_dict  = {}, {}
-        self.lower_bound, self.upper_bound = None, None
         self.kde_generation_factor = 10  # factor for generating extra interarrival times
         
         self.bw_smooth_factor = bw_smooth_factor # per (1+factor)*calced_bandwidth
@@ -97,12 +98,12 @@ class DataSimulator:
         self.prepare_kde_models()
 
         #set global upper and lower bound working hours
-        self.train_floats = transform_to_float(self.ref_data)
+        ref_data_timestamp_list = list(pd.to_datetime(self.ref_data['date'].values))
+        self.train_floats = transform_to_float(ref_data_timestamp_list)
         all_times = [item for sublist in self.train_floats for item in sublist]
         self.lower_bound = math.floor(min(all_times))
         self.upper_bound = min(math.ceil(max(all_times)), 23 + 59/60 + 59/3600 + 999999/1e6)
-
-    
+        
     def create_bins(self, earliest_time, latest_time):
         """
         Creates three equidistant time bins between earliest_time and latest_time.
@@ -149,8 +150,10 @@ class DataSimulator:
         self.diffed_data_dict = {}
         self.diffed_kernel_std_dict = {}
         # self.global_means = {}
-        
-        for segment_cluster, timestamp_list in self.train_segmented.items():
+
+        for segment_cluster, timestamp_list in self.train_clustered.items(): #key = 0
+            # self.logger.info(f'segment_cluster:{segment_cluster}')
+            # self.logger.info(f'timestamp_list:{timestamp_list[:2]}')
             timestamps_df = pd.DataFrame({'timestamp': timestamp_list})
             timestamps_df['weekday_num'] = timestamps_df['timestamp'].apply(lambda x: x.isoweekday()) #flag weekday
             timestamps_grouped = timestamps_df.groupby('weekday_num')
@@ -189,21 +192,25 @@ class DataSimulator:
                 'std_interarrival': std_interarrival_time_per_weekday
             })
             statistics_only_existing_weekdays_sorted = statistics_only_existing_weekdays.sort_values('weekday').reset_index(drop=True)
+            # self.logger.info(f'statistics_only_existing_weekdays_sorted: {statistics_only_existing_weekdays_sorted}')
 
-            
             #construct feature matrix 
             feature_matrix = statistics_only_existing_weekdays_sorted[['mean_num_arrivals','mean_interarrival', 'std_interarrival']].values #'mean_interarrival', 'std_interarrival' // 'mean_num_arrivals
 
             #standardize feature_matrix
             scaler = StandardScaler()
             feature_matrix_scaled = scaler.fit_transform(feature_matrix)
-
-            hierarchical_clusters = linkage(feature_matrix_scaled, method='ward')  # 'ward' minimises variance within clusters
-            max_clusters = 7
-            labels_hierarchical_clusters = fcluster(hierarchical_clusters, max_clusters, criterion='maxclust') - 1  # Subtract 1 for zero-based labels
             
-            self.logger.info(f'weekday cluster labels:{labels_hierarchical_clusters}\n')
-            statistics_only_existing_weekdays_sorted['cluster'] = labels_hierarchical_clusters
+            if len(feature_matrix_scaled) == 1:
+                #only one weekday, i.e., row in feature_matrix_scaled
+                statistics_only_existing_weekdays_sorted['cluster'] = [0]
+            else:
+                hierarchical_clusters = linkage(feature_matrix_scaled, method='ward')  # 'ward' minimises variance within clusters
+                max_clusters = 7
+                labels_hierarchical_clusters = fcluster(hierarchical_clusters, max_clusters, criterion='maxclust') - 1  # Subtract 1 for zero-based labels
+                
+                # self.logger.info(f'weekday cluster labels:{labels_hierarchical_clusters}\n')
+                statistics_only_existing_weekdays_sorted['cluster'] = labels_hierarchical_clusters
             
             #make sure that missing days are represented as such 
             all_weekdays = set(range(1, 8))
@@ -248,11 +255,6 @@ class DataSimulator:
                 
             #compute first differences and KDE standard deviations for each float cluster
             diffed_weekday_data_dict = {}
-            # for weekday_cluster in weekday_cluster_dict.keys():
-            #     diffed_weekday_data_dict[weekday_cluster] = np.array(self.first_diff_data(weekday_cluster_dict[weekday_cluster]))
-            # for weekday_cluster in missing_weekday_cluster_dict.keys():
-            #     diffed_weekday_data_dict[weekday_cluster] = np.array([])
-
             diffed_weekday_kernel_std_dict = {}
             
             #get a dictionary that holds the actual timestamps in a list for each cluster and contains all possible clusters 
@@ -261,12 +263,11 @@ class DataSimulator:
                 all_weekday_cluster_dict_timestamps[weekday_cluster] = timestamps_df[timestamps_df['cluster'] == weekday_cluster]['timestamp'].tolist()
             for weekday_cluster in statistics_only_missing_weekdays_with_cluster_label['cluster'].unique():
                 all_weekday_cluster_dict_timestamps[weekday_cluster] = []
-                
+
             for weekday_cluster, cluster_timestamps in all_weekday_cluster_dict_timestamps.items():
-                # print(cluster_timestamps)
-                # print('\n')
-                if len(cluster_timestamps) == 0:
-                    continue  # Skip empty clusters
+
+                if len(cluster_timestamps) <= 1:
+                    continue  # Skip empty clusters or such with only one timestamp (binning wont work, happened once with production dataset)
 
                 cluster_df = pd.DataFrame({'Timestamp': cluster_timestamps})
                 cluster_df['Timestamp'] = pd.to_datetime(cluster_df['Timestamp'])
@@ -280,12 +281,7 @@ class DataSimulator:
                 # Find earliest and latest times
                 earliest_time_in_seconds = cluster_df['Time_in_seconds'].min()
                 latest_time_in_seconds = cluster_df['Time_in_seconds'].max()
-                # print(cluster_df.head())
-                # print('\n')
-                # print(earliest_time_in_seconds)
-                # print(latest_time_in_seconds)
-                # print('\n')
-                
+
                 # Create bins
                 bin_edges, bin_labels = self.create_bins(earliest_time_in_seconds, latest_time_in_seconds)
                 # Assign bins
@@ -296,31 +292,8 @@ class DataSimulator:
                     include_lowest=True,
                     right=False
                 )
-                # print(cluster_df.head(20)) #should look like this for 1hr bins: 
-                #                          Timestamp        Date  Time_in_seconds    Bin
-                # 0         2020-04-06 09:00:00+00:00  2020-04-06        32400.000  bin_0
-                # 1  2020-04-06 10:51:34.931000+00:00  2020-04-06        39094.931  bin_1
-                # 2  2020-04-06 10:53:31.833000+00:00  2020-04-06        39211.833  bin_1
-                # 3  2020-04-06 11:12:54.486000+00:00  2020-04-06        40374.486  bin_2
-                # 4  2020-04-06 12:19:28.474000+00:00  2020-04-06        44368.474  bin_3
-                
-                # Group by 'Date' and 'Bin' to get counts
+
                 counts_per_bin_per_day = cluster_df.groupby(['Date', 'Bin']).size().unstack(fill_value=0)
-                # Compute global means per bin
-                # global_means = counts_per_bin_per_day.mean()
-                # Store global means for later use
-                # for bin_label in bin_labels:
-                    # key = f'weekday_cluster_{weekday_cluster}_{bin_label}'
-                    # self.global_means[key] = global_means.get(bin_label, 0) #global_means is local variant only 
-                # Add '_high' flags for each bin
-                # for bin_label in bin_labels:
-                    # counts_per_bin_per_day[bin_label + '_high'] = counts_per_bin_per_day[bin_label] > global_means[bin_label]
-                # print('\n')
-                # print(counts_per_bin_per_day.head(10))
-                # Bin         bin_0  bin_1  bin_2  bin_0_high  bin_1_high  bin_2_high
-                # Date
-                # 2020-04-06      4      7      2        True        True        True
-                # 2020-04-13      3      2      4        True       False        True
                 
                 # Process each date
                 for date in counts_per_bin_per_day.index:
@@ -328,15 +301,9 @@ class DataSimulator:
                     for idx, bin_label in enumerate(bin_labels):
                         bin_data = day_df[day_df['Bin'] == bin_label]
                         timestamps = bin_data['Timestamp'].sort_values()
-                        # print(f'\ntimestamps:{timestamps}')
-                        #0          2020-04-06 09:00:00+00:00
-                        # 1   2020-04-06 10:51:34.931000+00:00
-                        # 2   2020-04-06 10:53:31.833000+00:00
-                        # 3   2020-04-06 11:12:54.486000+00:00
+
                         # Convert timestamps to float hours
                         time_floats = timestamps.apply(lambda x: x.hour + x.minute / 60 + x.second / 3600 + x.microsecond / (1e6 * 3600)).values #correct computation as so far
-                        # print(f'time_floats:{time_floats}')
-                        #[ 9.         10.85970306 10.89217583 11.215135  ]
 
                         if len(time_floats) > 1:
                             interarrivals = np.diff(time_floats)
@@ -434,29 +401,6 @@ class DataSimulator:
             print(f"Error converting time_float {time_float}: {e}")
             print(f"Computed values - hours: {hours}, minutes: {minutes}, seconds: {seconds}, microseconds: {microseconds}")
             raise  # Re-raise the exception after printing
-    
-    def create_bins(self, earliest_time, latest_time):
-        """
-        Creates time bins with lengths specified as multiples of 1 hour,
-        starting from earliest_time until latest_time is overstepped.
-        The final bin that oversteps latest_time is truncated to latest_time.
-
-        Parameters:
-        - earliest_time (float): Earliest time in seconds.
-        - latest_time (float): Latest time in seconds.
-
-        Returns:
-        - bin_edges (list): Edges of the bins.
-        - bin_labels (list): Labels for the bins.
-        """
-        bin_size_seconds = self.bin_size_hours * 3600
-        bin_edges = [earliest_time]
-        while bin_edges[-1] + bin_size_seconds < latest_time:
-            bin_edges.append(bin_edges[-1] + bin_size_seconds)
-        # Add the last bin edge, which is the latest_time
-        bin_edges.append(latest_time)
-        bin_labels = [f'bin_{i}' for i in range(len(bin_edges) - 1)]
-        return bin_edges, bin_labels
 
     def sample_interarrivals(self, n_interarrivals, cluster_segment, cluster_weekday, bin_name):
         """
@@ -501,15 +445,18 @@ class DataSimulator:
         sampled_interarrivals = sampled_interarrivals[sampled_interarrivals > 0]
         return sampled_interarrivals
 
-    def sample_kde(self, n):
+    def sample_kde(self, start_time, end_time):
         """
+        Notes <IN DEVELOPMENT: DOC PROBABLY INACCURATE>
         Simulates data sequences for `n` days using KDE models of interarrival times.
 
         Parameters
         ----------
-        n : int
-            Number of days to simulate.
-
+        start_time : str
+            pd.timestamp.date object and checked if it adheres to 
+            restriction of no earlier than earliest train date and no later than last train date 
+        end_time : str
+            pd.timestamp.date object
         Returns
         -------
         all_sequences : list of pandas.Timestamp
@@ -518,7 +465,6 @@ class DataSimulator:
         sequence_lengths : list of int
             Lengths of sequences for each day.
 
-        Notes
         -----
         - Starts simulation from the last training timestamp.
         - Predicts clusters for each day, updating missing dates with closest available data.
@@ -526,57 +472,53 @@ class DataSimulator:
         - Ensures timestamps fit within daily bounds and converts them to UTC format.
         - Combines results across all days for the final output.
         """
-        #simulation shall begin at the end of training data 
-        self.final_timestamp_train = max(self.ref_data)
+        #simulation shall begin at the end of training data
+        min_timestamp_train = self.ref_data['date'].iloc[0]#train is sorted already
+        self.final_timestamp_train = self.ref_data['date'].iloc[-1]
+        start_ts = pd.to_datetime(start_time)
+        end_ts   = pd.to_datetime(end_time)
         
-        start_date = self.final_timestamp_train.date()
+        #align timezone to training tz
+        train_tz = min_timestamp_train.tz
+        if train_tz is not None:
+            start_ts = (start_ts.tz_localize(train_tz) if start_ts.tz is None
+                        else start_ts.tz_convert(train_tz))
+            end_ts = (end_ts.tz_localize(train_tz) if end_ts.tz is None
+                    else end_ts.tz_convert(train_tz))
+
+        if start_ts < min_timestamp_train:
+            self.logger.info("start_time before training period; using first train timestamp instead.")
+            start_ts = min_timestamp_train
+        if end_ts < start_ts:
+            raise ValueError(f"end_time ({end_ts}) is before start_time ({start_ts}).")
+        
+        start_date = pd.to_datetime(start_ts.normalize().date())
+        end_date   = pd.to_datetime(end_ts.normalize().date())
+        
         sequences_per_day = {}
         sequence_lengths_per_day = {}
+        
+        all_days = pd.date_range(start=start_date, end=end_date, freq="D")
+        for day_ts in all_days:
+            current_date = pd.to_datetime(day_ts)
+            corresponding_weekday_cluster = self.date_to_cluster[current_date.isoweekday()] 
+            #.isoweekday() gets integer value (range 1-7) for a date object
 
-        for day_offset in range(n):
-            current_date = start_date + timedelta(days=day_offset)
-            corresponding_weekday_cluster = self.date_to_cluster[current_date.isoweekday()] #.isoweekday() gets integer value (range 1-7) for a date object
+            if current_date not in self.test_cluster_estim.index:
+                continue
 
-            # Check if current_date is not in the index of self.test_segment_estim
-            #if this is the case, add this date and log it for a quick fix 
-            if current_date not in self.test_segment_estim.index:
-                self.logger.info(f"Current date {current_date} not found in test_segment_estim.index.")
-                self.logger.info(f"Start date: {start_date}")
-                self.logger.info(f"self.test_segment_estim:\n{self.test_segment_estim}")
-
-                #find the closest date in the DataFrame
-                closest_date = min(
-                    self.test_segment_estim.index,
-                    key=lambda date: abs(date - current_date)
-                )
-                #get the 'predicted_cluster' value from the closest date
-                predicted_cluster = self.test_segment_estim.loc[closest_date, 'predicted_cluster']
-                # Insert current_date into the DataFrame with the predicted_cluster value and sort df afterwards
-                self.test_segment_estim.loc[current_date] = {'predicted_cluster': predicted_cluster}
-
-                self.test_segment_estim = self.test_segment_estim.sort_index()
-                self.logger.info(f"updated self.test_segment_estim:\n{self.test_segment_estim}")
-                
-            current_date_predicted_cluster = int(self.test_segment_estim.loc[current_date, 'predicted_cluster'])
+            current_date_predicted_cluster = self.test_cluster_estim.loc[current_date, 'predicted_cluster']
             
             lower_time, upper_time = self.lower_bound, self.upper_bound
-            if day_offset == 0:
+            if current_date == start_date:
                 # Starting day
-                lower_time = self.final_timestamp_train.hour + self.final_timestamp_train.minute / 60 + self.final_timestamp_train.second / 3600
-            
-            # print(f'lower_time: {lower_time}')
-            # print(f'upper_time: {upper_time}')
-            
+                lower_time = self.final_timestamp_train.hour + \
+                                self.final_timestamp_train.minute / 60 + \
+                                    self.final_timestamp_train.second / 3600
             # Create bins for this cluster
             bin_edges, bin_labels = self.create_bins(lower_time * 3600, upper_time * 3600)
 
             float_bin_edges = [edge / 3600 for edge in bin_edges]
-            
-            # print('\n')
-            # print(f'bin_edges: {bin_edges}')
-            # print(f'bin_labels: {bin_labels}')
-            # print('\n')
-            # print(f'float_bin_edges: {float_bin_edges}')
             
             current_time = lower_time
             final_sequence = []
@@ -590,7 +532,7 @@ class DataSimulator:
                                                                     cluster_weekday = corresponding_weekday_cluster,
                                                                     bin_name = current_bin_name
                                                                 )
-                #gnerate raw sequence of arrival times
+                #generate raw sequence of arrival times
                 raw_bin_seq = current_time + np.cumsum(interarrival_samples)
                 #find index where the sequence surpasses the current bin edge
                 surpass_indices = np.where(raw_bin_seq > current_bin_edge)[0]

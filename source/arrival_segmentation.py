@@ -9,11 +9,52 @@ from datetime import datetime, timedelta
 from collections import Counter
 from itertools import groupby
 import logging
+from typing import Iterable, Tuple, List
+from datetime import date
 
 from utils.helper import transform_to_float
 
-
 def tune_sensitivity(list_of_timestamps, window_size=7, max_clusters=6, sensitivity_range=[0.1,1.0,0.9,0.8,0.7,0.6]):
+    """
+    Iteratively tune an outlier-detection sensitivity to segment arrival timestamps,
+    enforcing basic quality checks and a clustering cap.
+
+    Workflow
+    --------
+    For each `sensitivity` in `sensitivity_range` (in order):
+      1) Aggregate arrivals per day and compute sliding-window diffs.
+      2) Detect change points (IQR-based outliers) → derive break dates.
+      3) Split into segments; optionally add gradual-trend change points.
+      4) Validate segments: at least `window_size` days each and ≥2 segments.
+      5) Optionally refine the last segment; resegment.
+      6) Cluster segments and require `num_clusters ≤ max_clusters`.
+    On first sensitivity that passes all checks: merge segments, recluster, save results, and return.
+
+    If no sensitivity passes, falls back to a single segment covering all timestamps,
+    prints brief diagnostics, and returns with `finished=False`.
+
+    Parameters
+    ----------
+    list_of_timestamps : Iterable[pd.Timestamp]
+        Arrival times; tz-aware or naive. Order is not required.
+    window_size : int, default 7
+        Sliding window (days) used for diffs, minimum segment length, and trend detection.
+    max_clusters : int, default 6
+        Maximum allowed number of clusters produced by `apply_clustering`.
+    sensitivity_range : Iterable[float], default [0.1, 1.0, 0.9, 0.8, 0.7, 0.6]
+        Candidate IQR sensitivities to try, in descending priority (first valid wins).
+
+    Returns
+    -------
+    segments_new : list[list[pd.Timestamp]]
+        Final list of segments (each a list of timestamps), possibly merged.
+    finished : bool
+        True if a sensitivity satisfied all checks; False if fallback was used.
+    labels : list[int] or np.ndarray
+        Cluster labels for `segments_new` as returned by `apply_clustering`.
+    relevant_ratio : float
+        Summary metric returned by `save_results` for the final segmentation.
+    """
     df = aggregate_arrivals_per_day(list_of_timestamps)
     diff_list = sliding_window_diff(df, window_size=window_size)
     finished = False
@@ -72,8 +113,6 @@ def tune_sensitivity(list_of_timestamps, window_size=7, max_clusters=6, sensitiv
         relevant_ratio = save_results(segments_new, labels, sensitivity)
         
         return segments_new, finished, labels, relevant_ratio
-
-
 
 def aggregate_arrivals_per_day(list_of_timestamps):
     """
@@ -185,7 +224,6 @@ def compute_day_arrival_features(day):
     num_arrivals = len(day)  # Number of arrivals
     return num_arrivals, inter_arrival_times
 
-
 # Function to compute segment-level features from the arrivals
 def extract_features_from_segments(segments):
     features = []
@@ -229,7 +267,6 @@ def apply_clustering(segments, eps, min_samples):
     labels = dbscan.fit_predict(features_scaled)
     return labels
 
-
 def detect_gradual_change(list_of_timestamps, window_size):
     df = aggregate_arrivals_per_day(list_of_timestamps)
     # split the df into buckets of size window_size
@@ -253,7 +290,6 @@ def detect_gradual_change(list_of_timestamps, window_size):
                 change_point = i
                 return change_point
         return None
- 
     change_point = detect_change_points_in_trends(trends)
     if change_point:
         # get the date of the change point. Note that the change point is the week of the change, not the day
@@ -261,7 +297,6 @@ def detect_gradual_change(list_of_timestamps, window_size):
     else:
         date = None
     return date, trends
-
 
 def check_segment_lengths(segments, min_length_days):
     # Check if all segments have a duration of at least `min_length_days`
@@ -280,12 +315,10 @@ def check_segment_lengths(segments, min_length_days):
     
     return True  # All segments meet the minimum length
 
-
 def get_number_clusters(labels):
     unique_values = np.unique(labels)
     num_unique_values = len(unique_values)
     return num_unique_values
-
 
 def save_results(segments, labels, sensitivity):
     # Save segment times and sizes, or other relevant info
@@ -319,7 +352,6 @@ def save_results(segments, labels, sensitivity):
     
     return relevant_ratio
 
-
 def merge_segments(timestamps, cluster_labels):
     # Initialize the merged_segments list
     merged_segments = []
@@ -348,14 +380,12 @@ def merge_segments(timestamps, cluster_labels):
     
     return merged_segments
 
-
 def analyze_last_segment(segment, sensitivity):
     seg_df = aggregate_arrivals_per_day(segment)
     diff_seg_list = sliding_window_diff(seg_df,3)
     outliers_seg = detect_outliers_iqr(diff_seg_list, sensitivity=sensitivity)
     break_dates_seg = get_break_dates(outliers_seg,seg_df,3)
     return break_dates_seg
-
 
 def get_timeframe_years(list_of_timestamps):
     timestamps = [pd.Timestamp(ts) for ts in list_of_timestamps]
@@ -413,29 +443,43 @@ def detect_pattern(segments, clustered_segments, years):
     # No clear pattern
     return {"pattern": "none", "last_cluster": clustered_segments[-1], "start_dates": common_start_dates}
 
+def split_dayindex_by_stamp_span(
+    stamps: Iterable[pd.Timestamp],
+    day_index: pd.DatetimeIndex,
+    tz: str = "UTC",
+) -> Tuple[List[date], List[date]]:
+    """
+    From `day_index` (sequence of days), return:
+      - in_days:  days whose date lies within [min(stamps_date), max(stamps_date)]
+      - out_days: days before min(stamps_date) or after max(stamps_date)
 
-def extend_pattern(start_date, days_to_generate, segments, clustered_segments, years):
+    Dates are computed after aligning both `stamps` and `day_index` to timezone `tz`.
     """
-    Generate predicted dates and clusters based on detected patterns or continue last cluster if no pattern.
-    
-    Parameters:
-        start_date (str): Starting date for predictions (in YYYY-MM-DD format).
-        days_to_generate (int): Number of days to extend the pattern.
-        segments (list of lists): List of segments, each containing timestamps.
-        clustered_segments (list): Cluster labels for each segment.
-        years (int): Number of years in the dataset to assess the monthly pattern.
-        
-    Returns:
-        DataFrame with predicted dates and clusters.
-    """
-    # Initialize segment flag
+    # Handle empty stamps defensively
+    ts = pd.DatetimeIndex(stamps)
+    if len(ts) == 0:
+        di = day_index.tz_localize(tz) if day_index.tz is None else day_index.tz_convert(tz)
+        day_dates = [d.date() for d in di.normalize()]
+        return [], day_dates
+
+    # Align tz for stamps
+    ts = ts.tz_localize(tz) if ts.tz is None else ts.tz_convert(tz)
+    min_date = ts.min().normalize().date()
+    max_date = ts.max().normalize().date()
+
+    # Align tz for day_index and convert to date objects (preserve order)
+    di = day_index.tz_localize(tz) if day_index.tz is None else day_index.tz_convert(tz)
+    day_dates = [d.date() for d in di.normalize()]
+
+    in_days  = [d for d in day_dates if (min_date <= d <= max_date)]
+    out_days = [d for d in day_dates if not (min_date <= d <= max_date)]
+    return in_days, out_days
+
+def _construct_output_df_segment_flags(date_range, pattern_info, segments, clustered_segments):
     segment_flag = False
-
     # Take only cluster if there are no segments
+    all_dates = date_range #like pd.date_range(start, end)
     if len(segments)==1:
-        start_date = pd.to_datetime(start_date)
-        end_date = start_date + timedelta(days=days_to_generate - 1)
-        all_dates = pd.date_range(start=start_date, end=end_date)
         output = []
         last_known_cluster = clustered_segments[0]
         for date in all_dates:
@@ -446,18 +490,10 @@ def extend_pattern(start_date, days_to_generate, segments, clustered_segments, y
         output_df.columns = ["date", "predicted_cluster"]
         return output_df, segment_flag
 
-    # Detect pattern using the updated detect_pattern function
-    pattern_info = detect_pattern(segments, clustered_segments, years)
-    start_date = pd.to_datetime(start_date)
-    end_date = start_date + timedelta(days=days_to_generate - 1)
-    
-    # Generate the full date range for the output
-    all_dates = pd.date_range(start=start_date, end=end_date)
-    output = []
-    
     # Initialize the last known cluster
     last_known_cluster = pattern_info.get("last_cluster", None)
-    
+
+    output = []
     # Extend based on the detected pattern type
     if pattern_info["pattern"] == "monthly":
         common_start_dates = pattern_info["start_dates"]#
@@ -494,8 +530,7 @@ def extend_pattern(start_date, days_to_generate, segments, clustered_segments, y
         if start_info:
             for future_date in all_dates:
                 # Use the last cluster for all days in the range
-                #if start_info['day_of_month'] <= future_date.days_in_month:
-                adjusted_date = future_date #.replace(day=start_info['day_of_month'], month=start_info['month'])
+                adjusted_date = future_date 
                 output.append((adjusted_date, last_known_cluster))
     
     # Convert to DataFrame and ensure dates are unique and sorted
@@ -506,4 +541,152 @@ def extend_pattern(start_date, days_to_generate, segments, clustered_segments, y
     output_df = output_df.set_index('date').reindex(all_dates, method='ffill').reset_index()
     output_df.columns = ["date", "predicted_cluster"]
     
+    return output_df, segment_flag
+
+def cluster_calendar_from_segments(
+    segments: List[Iterable[pd.Timestamp]],
+    clustered_segments: List[int],
+    tz: str = "UTC",
+) -> pd.DataFrame:
+    """
+    Return a DataFrame mapping each calendar day covered by the segments
+    to its cluster label, using the implied continuous day range of each segment.
+
+    Only days that actually appear in the provided segments are retained.
+    Output columns: ['date', 'cluster'] with 'date' as midnight-normalized pd.Timestamp (tz-naive).
+    """
+    if len(segments) != len(clustered_segments):
+        raise ValueError("segments and clustered_segments must have the same length.")
+
+    rows = []
+    valid_days = set()  # union of actual segment days
+
+    for seg, lab in zip(segments, clustered_segments):
+        seg = pd.DatetimeIndex(seg)
+        if len(seg) == 0:
+            continue
+        # Align tz for consistent day comparisons
+        if tz is not None:
+            seg = seg.tz_localize(tz) if seg.tz is None else seg.tz_convert(tz)
+
+        # Collect actual days present in this segment
+        seg_days = seg.normalize().tz_localize(None)  # tz-naive midnights
+        valid_days.update(seg_days.unique().tolist())
+
+        # Build continuous range for labeling (min..max days)
+        day_min = seg_days.min()
+        day_max = seg_days.max()
+        days = pd.date_range(day_min, day_max, freq="D")
+        rows.extend((pd.Timestamp(d).tz_localize(None), int(lab)) for d in days)
+
+    if not rows:
+        return pd.DataFrame(columns=["date", "cluster"])
+
+    cal = (
+        pd.DataFrame(rows, columns=["date", "cluster"])
+        .sort_values("date")
+        .drop_duplicates(subset=["date"], keep="last")  # last wins on overlaps
+        .reset_index(drop=True)
+    )
+
+    if valid_days: #make sure invalid days (in date range but not in test) are not propagated
+        cal = cal[cal["date"].isin(valid_days)].reset_index(drop=True)
+
+    # print(f'---->cal (tail):\n{cal.tail(20)}')
+    return cal
+
+def label_train_timestamps_with_segments(
+    train_timestamps: Iterable[pd.Timestamp],
+    calendar_df: pd.DataFrame,
+    tz: str = "UTC",
+) -> pd.DataFrame:
+    """
+    Map each train timestamp to a cluster via the calendar.
+    Returns columns: ['timestamp', 'date', 'cluster'].
+    """
+    ts = pd.DatetimeIndex(train_timestamps)
+    if tz is not None:
+        ts = ts.tz_localize(tz) if ts.tz is None else ts.tz_convert(tz)
+    df = pd.DataFrame({"timestamp": ts})
+    df["date"] = df["timestamp"].normalize().dt.tz_localize(None)
+    out = df.merge(calendar_df, on="date", how="left")
+    return out
+
+def label_days_with_segments(
+    days: Iterable[pd.Timestamp],  # or iterable of datetime.date
+    calendar_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Label a set of days with clusters using the calendar.
+    Input 'days' can be date-like; result has ['date','predicted_cluster'].
+    """
+    days = pd.to_datetime(list(days))
+    df = pd.DataFrame({"date": pd.DatetimeIndex(days).normalize().tz_localize(None)})
+    df = df.drop_duplicates().sort_values("date")
+    df = df.merge(calendar_df, on="date", how="left")
+    return df.rename(columns={"cluster": "predicted_cluster"})
+
+
+def extend_pattern(train, start_date, end_date, segments, clustered_segments, years):
+    """
+    Generate predicted dates and clusters based on detected patterns or continue last cluster if no pattern.
+    
+    Parameters:
+        train: new 
+        end_date: new 
+        
+        start_date (str): Starting date for predictions (in YYYY-MM-DD format). #not added newly
+        segments (list of lists): List of segments, each containing timestamps.
+        clustered_segments (list): Cluster labels for each segment.
+        years (int): Number of years in the dataset to assess the monthly pattern.
+        
+        REMOVE: days_to_generate (int): Number of days to extend the pattern.
+    Returns:
+        output_df contains dates mapped to cluster labels from start to end date
+    """
+    #incision: to allow for train data simulation, we need to dissect the 
+    #range of simulation days into the subset that falls into train itself -> no prediction needed
+    #and the part outside -> prediction needed 
+    start_date = pd.to_datetime(start_date) #from run_all
+    end_date = pd.to_datetime(end_date) #from run_all
+    all_dates = pd.date_range(start=start_date, end=end_date)
+    
+    within_train, out_of_train = split_dayindex_by_stamp_span(train, all_dates, tz="UTC")
+    # print(f'----->within_train:{within_train}')
+    # Detect pattern using the updated detect_pattern function
+    pattern_info = detect_pattern(segments, clustered_segments, years) #info on complete train horizon 
+    # {'pattern': 'none', 'last_cluster': 1, 'start_dates': {0: {'day_of_month': 25, 'month': 3}, 1: {'day_of_month': 2, 'month': 5}}}
+    
+    # Build the segment calendar once
+    calendar_df = cluster_calendar_from_segments(segments, clustered_segments, tz="UTC")
+
+    if len(within_train) == 0:
+        # Only out-of-train, predict clusters
+        # print('Only out-of-train, predict clusters')
+        output_df, segment_flag = _construct_output_df_segment_flags(
+            pd.to_datetime(out_of_train), pattern_info, segments, clustered_segments
+        )
+
+    elif len(out_of_train) == 0:
+        # Only within-train, take segment labels 
+        # print('Only within-train, take segment labels')
+        within_df = label_days_with_segments(within_train, calendar_df)
+        output_df, segment_flag = within_df, False
+
+    else:
+        # Mixed case: concatenate labeled within-train + predicted out-of-train
+        # print('Mixed case: concatenate labeled within-train + predicted out-of-train')
+        within_df = label_days_with_segments(within_train, calendar_df)
+        predicted_df, segment_flag = _construct_output_df_segment_flags(
+            pd.to_datetime(out_of_train), pattern_info, segments, clustered_segments
+        )
+        output_df = (
+            pd.concat([within_df[["date","predicted_cluster"]], predicted_df], axis=0)
+            .sort_values("date")
+            .drop_duplicates(subset=["date"])
+            .reset_index(drop=True)
+        )
+    #reasons: within_df based on daterange (including not existing dates), cal df has true dates -> merge yields NAs for predicted clusters
+    output_df = output_df.dropna() 
+        
     return output_df, segment_flag
