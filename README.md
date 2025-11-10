@@ -1,4 +1,8 @@
-# README: AT-KDE << Under development for extended functionality, ETA: Dec. 25 >>
+# README: AT-KDE 
+
+<< Under development for extended functionality, ETA: Dec. 25 >>
+
+<< To run setup from BPM 2025 submission, revert to 690b4abcc622a57d8db6fefbabf56342aa85d04b >>
 
 Code Base for Paper "A Divide-and-Conquer Approach for Modeling Arrival Times in Business Process Simulation" by L. Kirchdorfer and K. Özdemir et al. (2025)
 ![](https://github.com/konradoezdemir/AT-KDE/blob/main/Flowchart_AT-KDE.png)
