@@ -11,10 +11,10 @@ from itertools import groupby
 import logging
 from typing import Iterable, Tuple, List
 from datetime import date
-
+from tqdm import tqdm 
 from utils.helper import transform_to_float
 
-def tune_sensitivity(list_of_timestamps, window_size=7, max_clusters=6, sensitivity_range=[0.1,1.0,0.9,0.8,0.7,0.6]):
+def tune_sensitivity(list_of_timestamps, window_size=7, max_clusters=6, sensitivity_range=[0.1,0.6,0.7,0.8,0.9,1.0]):
     """
     Iteratively tune an outlier-detection sensitivity to segment arrival timestamps,
     enforcing basic quality checks and a clustering cap.
@@ -26,7 +26,7 @@ def tune_sensitivity(list_of_timestamps, window_size=7, max_clusters=6, sensitiv
       2) Detect change points (IQR-based outliers) → derive break dates.
       3) Split into segments; optionally add gradual-trend change points.
       4) Validate segments: at least `window_size` days each and ≥2 segments.
-      5) Optionally refine the last segment; resegment.
+      REMOVED: 5) Optionally refine the last segment; resegment.
       6) Cluster segments and require `num_clusters ≤ max_clusters`.
     On first sensitivity that passes all checks: merge segments, recluster, save results, and return.
 
@@ -78,27 +78,34 @@ def tune_sensitivity(list_of_timestamps, window_size=7, max_clusters=6, sensitiv
         # Step 3d: Check if there are no segments
         if len(segments_new)<2:
             continue  # Skip this sensitivity and try the next one
-
         
-        last_seg_new = analyze_last_segment(segments_new[-1],sensitivity)
-        break_dates = break_dates.append(last_seg_new)
-        segments_new = get_segments(arrival_df,break_dates)
+        # last_seg_new = analyze_last_segment(segments_new[-1],sensitivity)
+        # break_dates = break_dates.append(last_seg_new)
+        # segments_new = get_segments(arrival_df,break_dates)
+        
         # Step 4: Cluster the segments and check the number of clusters
         labels = apply_clustering(segments_new,1,1)
-        num_clusters = get_number_clusters(labels)
+        num_clusters = len(np.unique(labels))
         if num_clusters > max_clusters:
             continue  # Skip this sensitivity and try the next one
         
         # Step 5: If all conditions are satisfied, save the results and stop
         finished = True
-        segments_new = merge_segments(segments_new, labels)
-        labels = apply_clustering(segments_new,1,1)
-        relevant_ratio = save_results(segments_new, labels, sensitivity)
+        print(f'labels:{labels}')
+        print(f'[len(s) for s in segments_new]:{[len(s) for s in segments_new]}')
+        # segments_new = merge_segments(segments_new, labels) -> not needed anymore as we dont refine last segment in addition
+        # labels = apply_clustering(segments_new,1,1)
+        # print(f'post merge -- [len(s) for s in segments_new]:{[len(s) for s in segments_new]}')
+        # print(f'post merge -- labels:{labels}')
+        
+        # relevant_ratio = save_results(segments_new, labels, sensitivity)
         #plot_arrivals_per_day(list_of_timestamps, outliers=outliers, window_size=window_size)
         if finished:
-            return segments_new, finished, labels, relevant_ratio
+            return segments_new, finished, labels#, relevant_ratio
     if not finished:
+        # print(f'##########Tuning sensitivity yielded no results, falling back to one segment/cluster.##########')
         relevant_segment = segments[-1] #this will not always hold true!
+        # relevant_segment = [s for seg in segments for s in seg] #fallback:all are relevant
         timestamps_sorted = sorted(relevant_segment, key=lambda x: x.date())
         grouped_by_day = [list(group) for _, group in groupby(timestamps_sorted, key=lambda x: x.date())]
         print(f'number of sequences (days): {len(grouped_by_day)}')
@@ -110,9 +117,9 @@ def tune_sensitivity(list_of_timestamps, window_size=7, max_clusters=6, sensitiv
         arrival_df = create_ts_df(list_of_timestamps)
         segments_new = [arrival_df['Arrival_Timestamp'].to_list()]
         labels = apply_clustering(segments_new,1,1)
-        relevant_ratio = save_results(segments_new, labels, sensitivity)
+        # relevant_ratio = save_results(segments_new, labels, sensitivity)
         
-        return segments_new, finished, labels, relevant_ratio
+        return segments_new, finished, labels#, relevant_ratio
 
 def aggregate_arrivals_per_day(list_of_timestamps):
     """
@@ -123,8 +130,9 @@ def aggregate_arrivals_per_day(list_of_timestamps):
         pd.DataFrame: DataFrame with date and count of arrivals.
     """
     df = pd.DataFrame(list_of_timestamps, columns=['timestamp'])
-    df['timestamp'] = pd.to_datetime(df['timestamp'], format='mixed')
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
     df['date'] = df['timestamp'].dt.date
+    df.drop(columns=['timestamp'], inplace=True)
     df['count'] = 1
     df = df.groupby('date').count().reset_index()
     return df
@@ -149,7 +157,7 @@ def sliding_window_diff(df, window_size):
 def detect_outliers_iqr(data, lower_percentile=15, upper_percentile=85, iqr_multiplier=1.5, sensitivity=1.0):
     # Convert the list to a numpy array
     data = np.array(data)
-    
+
     # Calculate Q1 and Q3 using the specified percentiles
     Q1 = np.percentile(data, lower_percentile)
     Q3 = np.percentile(data, upper_percentile)
@@ -304,8 +312,10 @@ def check_segment_lengths(segments, min_length_days):
         # Ensure there are timestamps in the segment to calculate duration
         if segment:
             # Calculate duration in days between the first and last timestamps in each segment
+            print(f'len(segment):{len(segment)}')
             duration_days = (max(segment) - min(segment)).days
             duration_days += 1
+            print(f'duration_days:{duration_days}')
         else:
             duration_days = 0  # Handle empty segments
             
@@ -315,16 +325,13 @@ def check_segment_lengths(segments, min_length_days):
     
     return True  # All segments meet the minimum length
 
-def get_number_clusters(labels):
-    unique_values = np.unique(labels)
-    num_unique_values = len(unique_values)
-    return num_unique_values
-
 def save_results(segments, labels, sensitivity):
+    """function needs to be overhauled, doesnt work as intended (relevant_segment)"""
     # Save segment times and sizes, or other relevant info
     segment_sizes = [len(seg) for seg in segments]
     
     relevant_segment = segments[-1] #this will not always hold true!
+
     timestamps_sorted = sorted(relevant_segment, key=lambda x: x.date())
     grouped_by_day = [list(group) for _, group in groupby(timestamps_sorted, key=lambda x: x.date())]
     
@@ -333,7 +340,7 @@ def save_results(segments, labels, sensitivity):
     # for li in grouped_by_day:
     #     logger.info(f'[l.date() for l in li]: {[l.date() for l in li]}')
     #     print('\n')
-    print('\n-----------')
+    # print('\n-----------')
     n_seqs_relevant_train = len(grouped_by_day)
     n_total_timestamps_relevant_train = len([s for seq in grouped_by_day for s in seq])
     logger.info(f'number of sequences (days): {n_seqs_relevant_train}')

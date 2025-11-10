@@ -38,8 +38,16 @@ class KDEIATGenerator():
             self.is_event_log = kwargs['is_event_log'] #declare whether dataset is TPP or event_log, for run-time improvement
             
     def generate_arrivals(self, start_time, end_time):
-        def _setup_clustered_train_dict(train):
+        def _setup_clustered_train_dict(train, prediction_start_t, prediction_end_t, verbose = None):
             """
+            in: 
+                train: list[Timestamp]
+                prediction_start_t: [Timstamp] start timestamp of domain that bw is validated on 
+                prediction_end_t: [Timstamp] end timestamp of domain that bw is validated on 
+            out: 
+                output_df: 
+                clustered_train_dict: constructs a dict of data, key: global cluster (int), value: corresponding data as list[Timestamp(...)]
+            
             some intermediate info:
             segment timeseries and get output_df, segment_tuned, and labels
             output_df is a df representing the predicted cluster for each date in the test set
@@ -50,21 +58,21 @@ class KDEIATGenerator():
                 self.arrival_likelihood = get_arrival_likelihood_per_day(train)
 
             years = get_timeframe_years(train)
-            segments_tuned, status_finished, labels, bandwidth_ratio = tune_sensitivity(train)
+            segments_tuned, status_finished, labels = tune_sensitivity(train)
 
-            self.logger.info(f'status_finished: {status_finished}')
-            self.logger.info(f'labels: {labels}')
-            self.logger.info(f'bandwidth_ratio: {bandwidth_ratio}')
+            self.logger.info(f'status_finished: {status_finished}') if verbose is not None else None
+            self.logger.info(f'labels: {labels}') if verbose is not None else None
+            # self.logger.info(f'bandwidth_ratio: {bandwidth_ratio}')
             output_df, segment_flag = extend_pattern(
                                                         train, 
-                                                        start_time, 
-                                                        end_time, 
+                                                        prediction_start_t, #comes from generate_arrivals
+                                                        prediction_end_t, #comes from generate_arrivals
                                                         segments_tuned, 
                                                         labels, 
                                                         years
                                                     )
-            self.logger.info(f'output_df prior segment_flag (unchanged if False, here: {segment_flag}): {output_df}')
-            self.logger.info(f'segment_flag: {segment_flag}')
+            self.logger.info(f'output_df prior segment_flag (unchanged if False, here: {segment_flag}): {output_df}') if verbose is not None else None
+            self.logger.info(f'segment_flag: {segment_flag}') if verbose is not None else None
 
             if segment_flag:
                 # segment_flag == True means: no trust in very last (too-short) segment; continue the previous cluster instead
@@ -97,16 +105,36 @@ class KDEIATGenerator():
                     clustered_train_dict[label] = corresponding_timestamps
             return output_df, clustered_train_dict
 
-        def _run_bandwidth_optimisation(train):
+        def _run_bandwidth_optimisation(train, cluster_fill_value):
+            """train comes as a list[Timestamp(...)]
+            in:
+                cluster_fill_value = value to be filled for monkey patch, as we pass the train data for each cluster here and
+                                    need to make sure it corresponds to it
+            
+            Note: 
+                    during bw optimisation, we always encounter clustered data as train, i.e.
+                    train is yet chosen from an overall clustered_train_dict. therefore, we do not 
+                    want to run into accidental resegmentation of an already existing cluster. however,
+                    we need the same structure as optimisation is taking place over the same metric as the overall
+                    generative model. we therefore "redo" this procedure, but monkey-path the clustering 
+                    such that the result is always one cluster belonging to one segment (=train)
+                    
+            """
             # We perform bandwidth optimization based on the validation set, which we take from the train data
             # clustered_train_dict: {cluster_label: [date1, date2, ...], ...}
             
             # split the training data into 80% train and 20% validation set 
-            train_bw = train[:int(0.8*len(train))]
-            val_bw = train[int(0.8*len(train)):]
-            
-            output_df, clustered_train_dict = _setup_clustered_train_dict(train_bw)
-            
+            train_bw = train[:round(0.8*len(train))]
+            val_bw = train[round(0.8*len(train)):]
+
+            output_df = pd.DataFrame(
+                                        data=cluster_fill_value, 
+                                        index = pd.date_range(val_bw[0].date(), val_bw[-1].date()), 
+                                        columns = ['predicted_cluster']
+                                    ).reset_index().rename(columns = {'index':'date'})
+            clustered_train_dict = {}
+            clustered_train_dict[cluster_fill_value] = train_bw
+
             train_df_clustered = (
                 pd.Series(clustered_train_dict)      # index = cluster, values = list of dates
                 .explode()                         # one row per (cluster, date)
@@ -115,59 +143,43 @@ class KDEIATGenerator():
                 .sort_values("date", ignore_index=True)
             )
 
-            # adapt clustered_train_dict by removing val_data
-            clustered_train_no_val_dict = (
-                                            train_df_clustered.groupby("cluster")["date"]
-                                                    .apply(lambda s: list(s.tolist()))   #retains train_data order
-                                                    .to_dict()
-                                        )
-            self.logger.info(f'clustered_train_dict:{clustered_train_dict.keys()}')
-            self.logger.info(f'clustered_train_no_val_dict:{clustered_train_no_val_dict.keys()}')
-
-            output_df = output_df.rename(columns = {'cluster':'predicted_cluster'})
-            output_df["date"] = pd.to_datetime(output_df["date"])
-            output_df["date"] = output_df["date"].dt.date
-            output_df = output_df.drop_duplicates().reset_index(drop = True)
-
-            # self.logger.info(f'output_df:{output_df}')
-
             #run optimization of bandwidth parameter
+            bw_factor_dict = {}
             bw_smooth_factors = [199, 149, 124, 99, 74, 49, 24, 9, 4, 2, 0.5, 0.0, -0.1, -0.25, -0.5, -0.75, -0.85, -0.99]
             
-            best_emd_iat = float('inf')
+            best_emd = float('inf')
             best_bw_factor = None
             bw_emd_dict = {bw: 0 for bw in bw_smooth_factors}
-            for factor in tqdm(bw_smooth_factors):
+            for factor in bw_smooth_factors:
+                self.logger.info(f'xxxxxxxxxxxxxxx\n Optimizing bw, current factor: {factor}')
+                bw_factor_dict[list(clustered_train_dict.keys())[0]] = factor
                 ds_class = DataSimulator(
                             domain = self.domain, 
                             reference_dataset=train_df_clustered, 
                             reference_data_lengths=None,
-                            train_clustered = clustered_train_no_val_dict,
+                            train_clustered = clustered_train_dict,
                             test_cluster_estim = output_df,
                             path = False, 
-                            bw_smooth_factor = factor
+                            bw_factor_dict = bw_factor_dict
                         )
-                self.logger.info(f'ds_class inception completed for bw_factor {factor}')
-                simulated_data, _ = ds_class.sample_kde(start_time = start_time, end_time = end_time)
+                simulated_data, _ = ds_class.sample_kde(start_time = val_bw[0], end_time = val_bw[-1])
 
                 # evaluate validation performance
                 validation_data =  pd.to_datetime(val_bw)
-                emd_iat = evaluate_validation_performance(simulated_data, validation_data)
-                self.logger.info(f'EMD IAT for bw_smooth_factor {factor}: {emd_iat}')
-                bw_emd_dict[factor] = emd_iat
-                if emd_iat < best_emd_iat:
-                    best_bw_factor = factor
-                    best_emd_iat = emd_iat
+                emd = evaluate_validation_performance(simulated_data, validation_data)
+                self.logger.info(f'EMD for bw_smooth_factor {factor}: {emd}')
 
-            self.logger.info(f'best_emd_iat: {best_emd_iat}')
-            self.logger.info(f'bw_emd_dict: {bw_emd_dict}')
+                bw_emd_dict[factor] = emd
+                if emd < best_emd:
+                    best_bw_factor = factor
+                    best_emd = emd
+
+            self.logger.info(f'best_emd: {best_emd}')
             self.logger.info(f'best_bw_factor: {best_bw_factor}')
-            return best_emd_iat, bw_emd_dict, best_bw_factor
-        
-        _, _, best_bw_factor = _run_bandwidth_optimisation(self.train.copy())
-        
-        output_df, clustered_train_dict = _setup_clustered_train_dict(self.train.copy())
-        
+            return best_emd, bw_emd_dict, best_bw_factor
+                
+        output_df, clustered_train_dict = _setup_clustered_train_dict(self.train.copy(), start_time, end_time, verbose = True)
+        self.logger.info(f'number of observations per cluster: {output_df.groupby("predicted_cluster").count()}')
         train_df_clustered = (
                 pd.Series(clustered_train_dict)      # index = cluster, values = list of dates
                 .explode()                         # one row per (cluster, date)
@@ -175,7 +187,17 @@ class KDEIATGenerator():
                 .reset_index(name="date")
                 .sort_values("date", ignore_index=True)
             )
-        # simulate arrivals with KDE    
+        
+        optimal_bandwidths_per_global_cluster = {}
+
+        for gc in clustered_train_dict:
+            self.logger.info(f'Optimize bandwidth for global cluster {gc}..')
+            # self.logger.info(f'respective days: {sorted(set([ts.date() for ts in clustered_train_dict[gc]]))}')
+            _, _, best_bw_factor_gc = _run_bandwidth_optimisation(clustered_train_dict[gc].copy(), gc)
+            optimal_bandwidths_per_global_cluster[gc] = best_bw_factor_gc
+        
+        # simulate arrivals with KDE  
+        self.logger.info(f'------------------------------------------Generating Now:\n')
         ds_class = DataSimulator(
                         domain = self.domain, 
                         reference_dataset=train_df_clustered, 
@@ -183,13 +205,43 @@ class KDEIATGenerator():
                         train_clustered = clustered_train_dict,
                         test_cluster_estim = output_df,
                         path = False, 
-                        bw_smooth_factor = best_bw_factor
+                        bw_factor_dict = optimal_bandwidths_per_global_cluster
                     )
 
         simulated_data, _ = ds_class.sample_kde(start_time = start_time, end_time = end_time)
         
         return simulated_data
 
+
+# def evaluate_validation_performance(simulated_data, val_data):
+#     """
+#     Compute the Wasserstein distance between the raw arrival times
+#     (seconds since midnight) of the validation set and the simulated data.
+#     """
+#     def _get_arrival_times_in_seconds(arrival_times):
+#         """
+#         Convert a list of arrival timestamps into seconds since midnight.
+#         Used for comparing raw arrival time distributions across days.
+#         """
+#         return [
+#             arrival.hour * 3600
+#             + arrival.minute * 60
+#             + arrival.second
+#             + arrival.microsecond / 1e6
+#             for arrival in arrival_times
+#         ]
+#     # Validation data: assumed non-empty
+#     test_data_for_distance = _get_arrival_times_in_seconds(val_data)
+
+#     if len(simulated_data) == 0:
+#         emd = np.infty
+#     else:
+#         sim_data_for_distance = _get_arrival_times_in_seconds(simulated_data)
+#         emd = wasserstein_distance(test_data_for_distance, sim_data_for_distance)
+
+#     return np.sqrt(emd)
+
+#bw optim on iats outdated
 
 def evaluate_validation_performance(simulated_data, val_data):
     """

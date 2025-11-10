@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import torch
-from chronos import ChronosPipeline
+from chronos import Chronos2Pipeline
 from datetime import timedelta
 
 class ChronosIATGenerator():
@@ -9,25 +9,25 @@ class ChronosIATGenerator():
     Generates inter arrival times by fitting a Chronos model to the training data
     """
 
-    def __init__(self, train_arrival_times, data_n_seqs) -> None:
+    def __init__(self, train_arrival_times) -> None:
         self.train = train_arrival_times
-        self.n_seqs = data_n_seqs
 
-    def generate_arrivals(self, start_time):
-        time_series_df, test_df = self.get_time_series_df(start_time)
+    def generate_arrivals(self, start_time, end_time):
+        time_series_df, test_df = self.get_time_series_df(start_time, end_time)
         print(time_series_df)
         # transform the arrival counts into a torch tensor
-        time_series_tensor = torch.tensor(time_series_df.values)
+        time_series_tensor = torch.tensor(time_series_df.values).view((1,1,len(time_series_df.values)))
+        print(time_series_tensor.size())
 
-        pipeline = ChronosPipeline.from_pretrained(
-            "amazon/chronos-t5-small",
+        pipeline = Chronos2Pipeline.from_pretrained(
+            "amazon/chronos-2",
             device_map="cpu",  # use "cpu" for CPU inference and "mps" for Apple Silicon
             torch_dtype=torch.bfloat16,
         )
         forecast = pipeline.predict(
-            context=time_series_tensor,
+            inputs=time_series_tensor,
             prediction_length=len(test_df),
-            num_samples=1,
+            # num_samples=1,
             limit_prediction_length=False,
         )
         # print(forecast[0])
@@ -58,7 +58,7 @@ class ChronosIATGenerator():
         return case_arrival_times
 
 
-    def get_time_series_df(self, start_time):
+    def get_time_series_df(self, start_time, end_time):
         """
         Convert train arrivals into a pandas df, aggregated by the number of arrivals for each unique hour.
         Create a test df with the timestamp as index and 0 values as placeholder; the start_time should be the first timestamp in the df
@@ -69,7 +69,8 @@ class ChronosIATGenerator():
 
         start_time = start_time.replace(minute=0, second=0, microsecond=0)
         test_df = pd.DataFrame(columns=['timestamp', 'arrivals'])
-        test_df['timestamp'] = pd.date_range(start=start_time, end=(start_time + timedelta(days=self.n_seqs+1)).replace(hour=0, minute=0, second=0), freq='h')
+        test_df['timestamp'] = pd.date_range(start=start_time, end=end_time, freq='h')
+        # test_df['timestamp'] = pd.date_range(start=start_time, end=(start_time + timedelta(days=self.n_seqs+1)).replace(hour=0, minute=0, second=0), freq='h')
         test_df['arrivals'] = 0
         test_df = test_df.set_index('timestamp')
 

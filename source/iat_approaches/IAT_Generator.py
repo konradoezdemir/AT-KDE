@@ -33,7 +33,6 @@ class IAT_Generator():
                                             train_arrival_times=self.train_arrival_times, 
                                             inter_arrival_durations=self.inter_arrival_durations, 
                                             arrival_distribution=arrival_distribution,
-                                            data_n_seqs = self.data_n_seqs,
                                             probabilistic_day=self.prob_day,
                                             kwargs=kwargs
                                             )
@@ -49,7 +48,6 @@ class IAT_Generator():
                                             train_arrival_times=self.train_arrival_times, 
                                             inter_arrival_durations=self.inter_arrival_durations, 
                                             arrival_distribution=arrival_distribution,
-                                            data_n_seqs = self.data_n_seqs,
                                             probabilistic_day=self.prob_day,
                                             kwargs = kwargs)
         elif method == 'best_distribution':
@@ -57,19 +55,16 @@ class IAT_Generator():
                                             train_arrival_times = self.train_arrival_times, 
                                             inter_arrival_durations = self.inter_arrival_durations, 
                                             arrival_distribution=None,
-                                            data_n_seqs = self.data_n_seqs,
                                             probabilistic_day=self.prob_day,
                                             kwargs = kwargs
                                             )
         elif method == 'prophet':
             self.generator = ProphetIATGenerator(
                                                 self.train_arrival_times, 
-                                                data_n_seqs = self.data_n_seqs
                                                 )
         elif method == 'npp':
             self.generator = NPPIATGenerator(
                                                 self.train_arrival_times, 
-                                                data_n_seqs = self.data_n_seqs,
                                                 probabilistic_day=self.prob_day
                                             )
         elif method == 'kde':
@@ -78,10 +73,10 @@ class IAT_Generator():
                                             kwargs = kwargs
                                             )
         elif method == 'lstm':
-            self.generator = LSTM_IAT_Generator(self.train_arrival_times, self.data_n_seqs, inter_arrival_durations=self.inter_arrival_durations,)
+            self.generator = LSTM_IAT_Generator(self.train_arrival_times, inter_arrival_durations=self.inter_arrival_durations)
         elif method == 'chronos':
-            self.generator = ChronosIATGenerator(self.train_arrival_times, self.data_n_seqs)
+            self.generator = ChronosIATGenerator(self.train_arrival_times)
         elif method == 'xgboost':
-            self.generator = XGBoostIATGenerator(self.train_arrival_times, self.data_n_seqs, seed=self.seed)
+            self.generator = XGBoostIATGenerator(self.train_arrival_times, seed=self.seed)
         else:
             raise ValueError('Nonexistent generator')

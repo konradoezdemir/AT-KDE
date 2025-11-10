@@ -181,6 +181,11 @@ if __name__ == "__main__":
             mode = 'full test'
             start_time = test[0]
             end_time = test[-1]
+        elif args.start_date == 'train_start' and args.end_date == 'test_end':
+            #default mode to simulate the set-out test period
+            mode = 'full dataset'
+            start_time = train[0]
+            end_time = test[-1]
         else:
             mode = 'custom specified'
             try: 
