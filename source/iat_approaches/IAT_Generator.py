@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 
 from source.iat_approaches.PDF import PDFIATGenerator
@@ -67,7 +66,7 @@ class IAT_Generator():
                                                 self.train_arrival_times, 
                                                 probabilistic_day=self.prob_day
                                             )
-        elif method == 'kde':
+        elif method == 'at_kde':
             self.generator = KDEIATGenerator(
                                             train_arrival_times = self.train_arrival_times, 
                                             kwargs = kwargs

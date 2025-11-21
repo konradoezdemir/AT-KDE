@@ -1,25 +1,25 @@
 import pandas as pd 
-from datetime import datetime, timedelta
+from datetime import datetime
 import argparse
 import warnings
 import os
 import logging  
 
-from utils.helper import read_json, write_json, transform_to_timestamp, KwargsAction, transform_to_float
+from utils.helper import read_json, write_json, KwargsAction, transform_to_float
 from source.iat_approaches.IAT_Generator import IAT_Generator
-# from source.arrival_distribution import get_inter_arrival_times
 
 def parse_arguments():
     # parse arguments 
     parser = argparse.ArgumentParser(description='Parameters')
     parser.add_argument('--input_type', type=str, default='list',
                         help='If the dataset is a list or a whole event log')
-    parser.add_argument('--dataset', type=str, default='SC_bs1000_min10',
+    parser.add_argument('--dataset', type=str, default='P2P',
                         help='Synthetic data filename')
     parser.add_argument('--method', type=str, default='all', help='Method to simulate inter-arrival times (mean, exponential, best_distribution, prophet, kde)')
     parser.add_argument('--prob_day', type=str, default='True', help='If the method should probabilistically consider non-working days')
     parser.add_argument('--run', type=int, default=1, help='current run index - necessary for robust result construction')
     parser.add_argument('--seed', type=int, default=0, help='seed for the xgboost model')
+    parser.add_argument('--tt_split', type=float, default=0.8, help='train/test ratio, default: 80% train')
     parser.add_argument('--start_date', type=str, default="start_test", help='set the start date for simulation period (%Y-%m-%d), if empty (default), resort to last train date')
     parser.add_argument('--end_date', type=str, default="end_test", help='set the end date for simulation period (%Y-%m-%d), if empty (default), resort to last test date')
     parser.add_argument('--kwargs', nargs='*', action=KwargsAction, default={}, help='Method-specific parameters as key=value pairs.')
@@ -36,15 +36,15 @@ def read_data(path):
 
 def get_arrival_times(df, TS):
     arrival_times = []
-    for case_id, events in df.groupby('case_id'):
+    for _, events in df.groupby('case_id'):
         arrival_times += [events[TS].min()]
     arrival_times.sort()
 
     return arrival_times
 
-def split_arrival_times(list_of_timestamps):
+def split_arrival_times(list_of_timestamps, threshold=0.8):
     """
-    Perform temporal hold out split with 80% training and 20% testing.
+    Perform temporal hold out split with threshold % training and (1-threshold)% testing.
 
     Parameters:
     - list_of_timestamps (list): The generated timestamps.
@@ -57,7 +57,7 @@ def split_arrival_times(list_of_timestamps):
     arrival_times.sort()
 
     number_times = (len(arrival_times))
-    train_size = int(0.8 * number_times)
+    train_size = int(threshold * number_times)
 
     train = arrival_times[:train_size]
     test = arrival_times[train_size:]
@@ -135,7 +135,6 @@ def store_data(case_arrival_times, start_time, end_time, train, test, args, logg
         print('writing train..')
         write_json(path_to_file_train, train) if args.run == 1 else None
         print('complete.')
-    
 
 
 if __name__ == "__main__":
@@ -147,6 +146,7 @@ if __name__ == "__main__":
     logger.info(f'Current dataset: {args.dataset}')
     method = args.method
     prob_day = args.prob_day #bool
+    tt_split = args.tt_split
 
     if args.input_type == 'event_log': # extract case arrival timestamps from event log and transform to list
         event_log_data = True
@@ -161,13 +161,7 @@ if __name__ == "__main__":
         list_of_timestamps = get_arrival_times(event_log, TS)
         
     #temporal split needs to take place regardless of start time due to downstream tasks etc.
-    train, test = split_arrival_times(list_of_timestamps) #returns sorted lists of timestamps
-    # cvs_pharmacy
-    # earliest_date train: 2019-03-25
-    # latest_date train: 2019-05-14
-    # earliest_date test: 2019-05-14
-    # latest_date test: 2019-05-27
-
+    train, test = split_arrival_times(list_of_timestamps, threshold = tt_split) #returns sorted lists of timestamps
     inter_arrival_durations = get_inter_arrival_times_from_list_of_timestamps(arrival_times=train)
 
     if args.start_date is not None and args.end_date is not None:

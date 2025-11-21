@@ -1,14 +1,8 @@
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
-import math
-import copy
-from scipy.stats import ks_2samp, wasserstein_distance
+from scipy.stats import wasserstein_distance
 import logging
-from tqdm import tqdm 
 from utils.helper import (
-                            transform_to_timestamp, 
-                            transform_to_float, 
                             get_arrival_likelihood_per_day, 
                             get_inter_arrival_times_from_list_of_timestamps
                         )
@@ -45,12 +39,10 @@ class KDEIATGenerator():
                 prediction_start_t: [Timstamp] start timestamp of domain that bw is validated on 
                 prediction_end_t: [Timstamp] end timestamp of domain that bw is validated on 
             out: 
-                output_df: 
+                output_df: [pd.DataFrame] representing the predicted cluster for each date in the test set
                 clustered_train_dict: constructs a dict of data, key: global cluster (int), value: corresponding data as list[Timestamp(...)]
             
-            some intermediate info:
-            segment timeseries and get output_df, segment_tuned, and labels
-            output_df is a df representing the predicted cluster for each date in the test set
+            some additional info:
             segments_tuned is a list of lists, where each sublist is a segment of consecutive days
             labels is a list of labels, where each label is the cluster number for the corresponding segment
             """
@@ -71,9 +63,9 @@ class KDEIATGenerator():
                                                         labels, 
                                                         years
                                                     )
-            self.logger.info(f'output_df prior segment_flag (unchanged if False, here: {segment_flag}): {output_df}') if verbose is not None else None
-            self.logger.info(f'segment_flag: {segment_flag}') if verbose is not None else None
-
+            # self.logger.info(f'output_df prior segment_flag (unchanged if False, here: {segment_flag}): {output_df}') if verbose is not None else None
+            # self.logger.info(f'segment_flag: {segment_flag}') if verbose is not None else None
+            
             if segment_flag:
                 # segment_flag == True means: no trust in very last (too-short) segment; continue the previous cluster instead
                 #last segment now becomes original last and the one preceeding merged together
@@ -120,13 +112,10 @@ class KDEIATGenerator():
                     such that the result is always one cluster belonging to one segment (=train)
                     
             """
-            # We perform bandwidth optimization based on the validation set, which we take from the train data
-            # clustered_train_dict: {cluster_label: [date1, date2, ...], ...}
+            #bw optim happens on train and is directly evalutated against it via generation of new arrivals 
+            train_bw = train
+            val_bw = train
             
-            # split the training data into 80% train and 20% validation set 
-            train_bw = train[:round(0.8*len(train))]
-            val_bw = train[round(0.8*len(train)):]
-
             output_df = pd.DataFrame(
                                         data=cluster_fill_value, 
                                         index = pd.date_range(val_bw[0].date(), val_bw[-1].date()), 
@@ -151,7 +140,6 @@ class KDEIATGenerator():
             best_bw_factor = None
             bw_emd_dict = {bw: 0 for bw in bw_smooth_factors}
             for factor in bw_smooth_factors:
-                self.logger.info(f'xxxxxxxxxxxxxxx\n Optimizing bw, current factor: {factor}')
                 bw_factor_dict[list(clustered_train_dict.keys())[0]] = factor
                 ds_class = DataSimulator(
                             domain = self.domain, 
@@ -167,19 +155,24 @@ class KDEIATGenerator():
                 # evaluate validation performance
                 validation_data =  pd.to_datetime(val_bw)
                 emd = evaluate_validation_performance(simulated_data, validation_data)
-                self.logger.info(f'EMD for bw_smooth_factor {factor}: {emd}')
+                # self.logger.info(f'EMD for bw_smooth_factor {factor}: {emd}')
 
                 bw_emd_dict[factor] = emd
                 if emd < best_emd:
                     best_bw_factor = factor
                     best_emd = emd
 
-            self.logger.info(f'best_emd: {best_emd}')
-            self.logger.info(f'best_bw_factor: {best_bw_factor}')
+            # self.logger.info(f'best_emd: {best_emd}')
+            # self.logger.info(f'best_bw_factor: {best_bw_factor}')
             return best_emd, bw_emd_dict, best_bw_factor
                 
-        output_df, clustered_train_dict = _setup_clustered_train_dict(self.train.copy(), start_time, end_time, verbose = True)
-        self.logger.info(f'number of observations per cluster: {output_df.groupby("predicted_cluster").count()}')
+        output_df, clustered_train_dict = _setup_clustered_train_dict(self.train.copy(), start_time, end_time)
+        #diagnostics to access globally set clusters 
+        # self.logger.info('Saving output_df to csv...')
+        # output_df.to_csv('output_df.csv')
+        # self.logger.info('Complete.')
+        
+        # self.logger.info(f'number of observations per cluster: {output_df.groupby("predicted_cluster").count()}')
         train_df_clustered = (
                 pd.Series(clustered_train_dict)      # index = cluster, values = list of dates
                 .explode()                         # one row per (cluster, date)
@@ -192,12 +185,12 @@ class KDEIATGenerator():
 
         for gc in clustered_train_dict:
             self.logger.info(f'Optimize bandwidth for global cluster {gc}..')
-            # self.logger.info(f'respective days: {sorted(set([ts.date() for ts in clustered_train_dict[gc]]))}')
             _, _, best_bw_factor_gc = _run_bandwidth_optimisation(clustered_train_dict[gc].copy(), gc)
             optimal_bandwidths_per_global_cluster[gc] = best_bw_factor_gc
-        
+            
+        self.logger.info(f'Optimization complete.')
         # simulate arrivals with KDE  
-        self.logger.info(f'------------------------------------------Generating Now:\n')
+        self.logger.info('Generating Arrivals now...')
         ds_class = DataSimulator(
                         domain = self.domain, 
                         reference_dataset=train_df_clustered, 
@@ -209,39 +202,8 @@ class KDEIATGenerator():
                     )
 
         simulated_data, _ = ds_class.sample_kde(start_time = start_time, end_time = end_time)
-        
+        self.logger.info('Complete.')
         return simulated_data
-
-
-# def evaluate_validation_performance(simulated_data, val_data):
-#     """
-#     Compute the Wasserstein distance between the raw arrival times
-#     (seconds since midnight) of the validation set and the simulated data.
-#     """
-#     def _get_arrival_times_in_seconds(arrival_times):
-#         """
-#         Convert a list of arrival timestamps into seconds since midnight.
-#         Used for comparing raw arrival time distributions across days.
-#         """
-#         return [
-#             arrival.hour * 3600
-#             + arrival.minute * 60
-#             + arrival.second
-#             + arrival.microsecond / 1e6
-#             for arrival in arrival_times
-#         ]
-#     # Validation data: assumed non-empty
-#     test_data_for_distance = _get_arrival_times_in_seconds(val_data)
-
-#     if len(simulated_data) == 0:
-#         emd = np.infty
-#     else:
-#         sim_data_for_distance = _get_arrival_times_in_seconds(simulated_data)
-#         emd = wasserstein_distance(test_data_for_distance, sim_data_for_distance)
-
-#     return np.sqrt(emd)
-
-#bw optim on iats outdated
 
 def evaluate_validation_performance(simulated_data, val_data):
     """

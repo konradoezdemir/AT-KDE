@@ -1,14 +1,12 @@
-# README: AT-KDE 
-
-<< Under development for extended functionality, ETA: Dec. 25 >>
-
-<< To run setup from BPM 2025 submission, revert to 690b4abcc622a57d8db6fefbabf56342aa85d04b >>
+# README: AT-KDE
 
 Code Base for Paper "A Divide-and-Conquer Approach for Modeling Arrival Times in Business Process Simulation" by L. Kirchdorfer and K. Özdemir et al. (2025)
 ![](https://github.com/konradoezdemir/AT-KDE/blob/main/Flowchart_AT-KDE.png)
 
-## Introduction
+## Update Notification
+As of Nov. 21st 2025, AT-KDE has been equipped with extended functionality. The simulation domain can now be specified via keywords (see below) or by passing specific dates. It is now possible to simulate, for example, the train horizon only. The prior version, in contrast, only allowed for the hybrid simulation/forecast of the test domain. Moreover, the train/test split is now specifiable via the command line as well (see below). Finally, bandwidth optimisation of the kernel density estimator has been improved. More details on the extended functionality will follow soon.
 
+## Introduction
 **Abstract**
 
 Business Process Simulation (BPS) is a critical tool for analyzing and improving organizational processes by estimating the impact of process changes. A key component of BPS is the case-arrival model, which determines the pattern of new case entries into a process. Although accurate case-arrival modeling is essential for reliable simulations---as it influences waiting and overall cycle times---existing approaches often rely on oversimplified static distributions of inter-arrival times. These approaches fail to capture the dynamic and temporal complexities inherent in organizational environments, leading to less accurate and reliable outcomes. To address this limitation, we propose \emph{Auto Time Kernel Density Estimation} (AT-KDE), a divide-and-conquer approach that models arrival times of processes by incorporating global dynamics, day-of-week variations, and intraday distributional changes, ensuring both precision and scalability. Experiments conducted across 20 diverse processes demonstrate that AT-KDE is far more accurate and robust than existing approaches while maintaining sensible execution time efficiency.
@@ -82,13 +80,39 @@ Business Process Simulation (BPS) is a critical tool for analyzing and improving
     .\atkde_env\Scripts\activate  #for windows 
 
     pip install -r requirements.txt
+
 ## Usage Example: Single Data Simulation
 This command will use the AT-KDE approach to model inter-arrival times based on the provided event log, creating a highly dynamic and precise simulation of case arrivals.
 ```bash
-python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method kde --run 1
+python generate_arrivals.py --input_type event_log --dataset P2P --method at_kde --tt_split 0.8 --start_date test_start --end_date test_end --run 1
 ```
+
+### Command-line arguments
+
+| Argument       |           Type |             Default | Meaning                                                                                                    |
+| -------------- | -------------: | ------------------: | ---------------------------------------------------------------------------------------------------------- |
+| `--input_type` |            str |            `"list"` | `"list"` for JSON arrival lists, `"event_log"` for CSV logs.                                               |
+| `--dataset`    |            str |            `"P2P"`  | Dataset name. Used for locating inputs and naming outputs.                                                 |
+| `--method`     |            str |             `"all"` | IAT simulation method (e.g., `mean`, `exponential`, `best_distribution`, `prophet`, `at_kde`, ...). |
+| `--prob_day`   |            str |            `"True"` | If `"True"`, non-working days are treated probabilistically (except for `prophet`).                        |
+| `--run`        |            int |                 `1` | Run index. Controls naming of simulated file and whether train/test are written.                           |
+| `--seed`       |            int |                 `0` | Random seed passed into the generator (e.g., for XGBoost or sampling).                                     |
+| `--tt_split`   |          float |               `0.8` | Temporal train/test split fraction.                                                                        |
+| `--start_date` |            str |      `"start_test"` | Simulation window start. Use tokens (see below) or `%Y-%m-%d`.                                             |
+| `--end_date`   |            str |        `"end_test"` | Simulation window end. Use tokens (see below) or `%Y-%m-%d`.                                               |
+| `--kwargs`     | key=value list |                `{}` | Method-specific parameters forwarded to `IAT_Generator`.                                                   |
+
+### Simulation window tokens
+Use these to avoid manual date picking:
+| start_date        | end_date          | Resulting window                |
+| ----------------- | ----------------- | ------------------------------- |
+| `train_start`     | `train_end`       | simulate over **train period**  |
+| `test_start`      | `test_end`        | simulate over **test period**   |
+| `train_start`     | `test_end`        | simulate over **full dataset**  |
+| custom `%Y-%m-%d` | custom `%Y-%m-%d` | simulate over your custom range |
+
 ## Usage Example: Multi/Comparison Data Simulation
-This command will run all benchmark models and AT-KDE on a selection of datasets in the data directory. Results are stored as an .xlsx reporting root-cadd scores and a jpeg with arrival count plot comparisons.
+This command will run all benchmark models and AT-KDE on a selection of datasets in the data directory. Results are stored as an .xlsx reporting root-CADD scores.
 ```bash
 cd run_shells
 ./run_all.ps1 #for windows 
