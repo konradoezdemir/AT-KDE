@@ -7,7 +7,7 @@ echo "-----------------------------"
 
 # Define the total number of iterations
 Seeds=(0 13 42 100 27 53 69 81 99 101)
-TotalRuns=10
+TotalRuns=1
 echo "Begin simulating $TotalRuns runs of data simulation."
 
 for ((i=1; i<=TotalRuns; i++)); do
@@ -137,27 +137,27 @@ for ((i=1; i<=TotalRuns; i++)); do
     # echo "-----------------------------"
 
     # Run lstm approach
-    # echo "Running lstm approach for iteration $i..."
-    # python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset PermitLog --method lstm --run $i
-    # # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset P2P --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset Production --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset env_permit --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset HelpDesk --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset Hospital --method lstm --run $i
-    # python generate_arrivals.py --input_type event_log --dataset Sepsis --method lstm --run $i
+    echo "Running lstm approach for iteration $i..."
+    python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset PermitLog --method lstm --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset P2P --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset Production --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset env_permit --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset HelpDesk --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset Hospital --method lstm --run $i
+    python generate_arrivals.py --input_type event_log --dataset Sepsis --method lstm --run $i
 
     # Run chronos approach
     # echo "Running chronos approach for iteration $i..."
@@ -183,29 +183,29 @@ for ((i=1; i<=TotalRuns; i++)); do
     # python generate_arrivals.py --input_type event_log --dataset Sepsis --method chronos --run $i
 
     # Run xgboost approach
-    echo "Running xgboost approach for iteration $i..."
-    seed=${Seeds[$i-1]}
-    echo "Seed: $seed"
-    python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset PermitLog --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset P2P --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset Production --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset env_permit --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset HelpDesk --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset Hospital --method xgboost --seed $seed --run $i
-    python generate_arrivals.py --input_type event_log --dataset Sepsis --method xgboost --seed $seed --run $i
+    # echo "Running xgboost approach for iteration $i..."
+    # seed=${Seeds[$i-1]}
+    # echo "Seed: $seed"
+    # python generate_arrivals.py --input_type event_log --dataset Confidential_2000 --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset Confidential_1000 --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset ConsultaDataMining --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPIC_2017_W --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset PermitLog --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2019 --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset P2P --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset Production --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset cvs_pharmacy --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012 --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012CW --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012O --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2012W --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPI_Challenge_2013C --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPIC20_DomesticDeclarations --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset BPIC20_InternationalDeclarations --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset env_permit --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset HelpDesk --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset Hospital --method xgboost --seed $seed --run $i
+    # python generate_arrivals.py --input_type event_log --dataset Sepsis --method xgboost --seed $seed --run $i
 
     echo "Complete."
     echo "-----------------------------"
@@ -213,12 +213,12 @@ done
 
 echo "All runs completed successfully!"
 
-# Run evaluation pipeline
-echo "Running evaluation pipeline..."
-cd "$(dirname "$(realpath "$0")")/../diagnostics"
-python eval_event_logs.py --res_dir=results --total_runs=$TotalRuns --metric=CADD --method_types=prob --methods=xgboost
-echo "Complete."
-echo "-----------------------------"
+# # Run evaluation pipeline
+# echo "Running evaluation pipeline..."
+# cd "$(dirname "$(realpath "$0")")/../diagnostics"
+# python eval_event_logs.py --res_dir=results --total_runs=$TotalRuns --metric=CADD --method_types=prob --methods=xgboost
+# echo "Complete."
+# echo "-----------------------------"
 
 echo "Finishing script now."
 cd ..

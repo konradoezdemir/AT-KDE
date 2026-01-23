@@ -5,6 +5,7 @@ import argparse
 import warnings
 import os
 import logging  
+from time import time
 
 from utils.helper import read_json, write_json, transform_to_timestamp, KwargsAction, transform_to_float
 from source.iat_approaches.IAT_Generator import IAT_Generator
@@ -95,7 +96,7 @@ def store_data(event_log_data, case_arrival_times, test, train, args):
     fn_train = f'train.json'
 
     if not args.kwargs: # if we run evaluation for CADD metric
-        dir = 'event_log_simulations'
+        dir = 'sim_train'
     else:
         dir = os.path.join('synthetic_data', 'simulations')
 
@@ -133,6 +134,7 @@ def store_data(event_log_data, case_arrival_times, test, train, args):
 
 
 if __name__ == "__main__":
+    start = time()
     logging.basicConfig(level=logging.INFO, format='%(filename)s - %(message)s')
     logger = logging.getLogger(__name__)
     
@@ -171,10 +173,10 @@ if __name__ == "__main__":
     train, test = split_arrival_times(list_of_timestamps)
     inter_arrival_durations = get_inter_arrival_times_from_list_of_timestamps(arrival_times=train)
     # num_instances = len(test)
-    start_time = test[0]
+    start_time = train[0]
     
     # get number of to be simulated sequences (only relevant for KDE)
-    test_datetimes = pd.to_datetime(test)
+    test_datetimes = pd.to_datetime(train)
     unique_dates = test_datetimes.date
     earliest_date = test_datetimes.min().date()
     latest_date = test_datetimes.max().date()
@@ -191,6 +193,13 @@ if __name__ == "__main__":
                                 kwargs = args.kwargs,
                                 seed = args.seed
                             )
+    train_time_end = time()
+    train_time = train_time_end - start
+    # write to a log file
+    with open('log.txt', 'a') as f:
+        f.write(f"Train time: {train_time}\n")
+
+    start = time()
 
     # generate arrivals
     case_arrival_times = generator.generate(start_time=start_time)
@@ -201,5 +210,11 @@ if __name__ == "__main__":
             test = transform_to_float(test)
             if 'kde' not in args.method:
                 case_arrival_times = transform_to_float(case_arrival_times)
+
+    generate_time_end = time()
+    generate_time = generate_time_end - start
+    # write to a log file
+    with open('log.txt', 'a') as f:
+        f.write(f"Inference time: {generate_time}\n")
             
     store_data(event_log_data, case_arrival_times, test, train, args)
