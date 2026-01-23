@@ -85,7 +85,18 @@ class Evaluation:
         # Define available methods for each type
         self.available_methods = {
             'raw': ['mean', 'exponential', 'best_distribution', 'npp', 'kde'],
-            'prob': ['mean_prob', 'exponential_prob', 'best_distribution_prob', 'prophet', 'kde_prob', 'npp_prob']
+            # For probabilistic methods, treat different at_kde bin sizes as separate "methods"
+            'prob': [
+                'mean_prob',
+                'exponential_prob',
+                'best_distribution_prob',
+                'prophet',
+                'at_kde_prob',
+                'at_kde_prob_bin_1',
+                'at_kde_prob_bin_5',
+                'at_kde_prob_bin_7',
+                'npp_prob',
+            ]
             # 'prob': ['mean_prob', 'exponential_prob', 'best_distribution_prob', 'prophet', 'kde_prob', 'lstm', 'chronos', 'xgboost', 'npp_prob']
         }
 

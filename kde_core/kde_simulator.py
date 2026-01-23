@@ -125,12 +125,13 @@ class DataSimulator:
         - bin_edges (list): Edges of the bins.
         - bin_labels (list): Labels for the bins.
         """
-        # Calculate the size of each bin
+        # Calculate the size of each bin using the configured bin size (in hours)
+        total_seconds = max(latest_time - earliest_time, 1)
+        bin_seconds = max(self.bin_size_hours * 3600, 1)
+        # Ensure at least one bin
+        factor = max(1, int(np.ceil(total_seconds / bin_seconds)))
 
-        #dynamically bin into hours
-        factor = 3 #int(np.round((latest_time-earliest_time)/3600))
-        
-        delta = (latest_time - earliest_time) / factor #3 = morning afternoon evening 
+        delta = (latest_time - earliest_time) / factor
         # Generate bin edges
         bin_edges = [earliest_time + i * delta for i in range(factor + 1)]
         # Create bin labels

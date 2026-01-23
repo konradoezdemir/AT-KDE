@@ -100,20 +100,27 @@ def store_data(case_arrival_times, start_time, end_time, train, test, args, logg
     fn_test = f'test.json'
     fn_train = f'train.json'
 
-    if not args.kwargs: # if we run evaluation for CADD metric
-        dir = 'event_log_simulations'
-    else:
-        dir = os.path.join('synthetic_data', 'simulations')
+    dir = 'event_log_simulations'
+    # if not args.kwargs: # if we run evaluation for CADD metric
+    #     dir = 'event_log_simulations'
+    # else:
+    #     dir = os.path.join('synthetic_data', 'simulations')
 
     if args.prob_day == "True" and args.method != 'prophet':
-        method = f"{args.method}_prob"
+        base_method = f"{args.method}_prob"
     else:
-        method = args.method
+        base_method = args.method
 
-    data_dir = os.path.join(os.getcwd(), dir, method, args.dataset)
-    path_to_file_sim = os.path.join(os.getcwd(), dir, method, args.dataset, fn_sim)
-    path_to_file_test = os.path.join(os.getcwd(), dir, method, args.dataset, fn_test)
-    path_to_file_train = os.path.join(os.getcwd(), dir, method, args.dataset, fn_train)
+    # If a bin size is provided (for at_kde), encode it into the method folder name
+    if 'bin_size_hours' in args.kwargs:
+        method_dir = f"{base_method}_bin_{args.kwargs['bin_size_hours']}"
+    else:
+        method_dir = base_method
+
+    data_dir = os.path.join(os.getcwd(), dir, method_dir, args.dataset)
+    path_to_file_sim = os.path.join(os.getcwd(), dir, method_dir, args.dataset, fn_sim)
+    path_to_file_test = os.path.join(os.getcwd(), dir, method_dir, args.dataset, fn_test)
+    path_to_file_train = os.path.join(os.getcwd(), dir, method_dir, args.dataset, fn_train)
 
     if not os.path.exists(data_dir):
     # If it doesn't exist, create the directory

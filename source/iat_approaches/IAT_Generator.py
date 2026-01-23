@@ -5,7 +5,7 @@ from source.iat_approaches.prophet_ import ProphetIATGenerator
 from source.iat_approaches.kde import KDEIATGenerator
 from source.arrival_distribution import DurationDistribution
 from source.iat_approaches.lstm import LSTM_IAT_Generator
-from source.iat_approaches.chronos import ChronosIATGenerator
+# from source.iat_approaches.chronos import ChronosIATGenerator
 from source.iat_approaches.xgboost import XGBoostIATGenerator
 from source.iat_approaches.npp import NPPIATGenerator
 

@@ -15,7 +15,7 @@ echo "-----------------------------"
 # (Optional) restrict to a subset of datasets
 #   - Leave empty () to use ALL datasets.
 #   - Example: DatasetsToRun=("Sepsis")
-DatasetsToRun=("P2P")
+DatasetsToRun=()
 
 # (Optional) restrict to a subset of methods (by Name)
 #   - Leave empty () to use ALL methods.
@@ -23,10 +23,10 @@ DatasetsToRun=("P2P")
 MethodNamesToRun=("at_kde")
 
 TrainTestSplit=0.8
-TrainStart="train_start"
-TrainEnd="train_end"
+TrainStart="test_start"
+TrainEnd="test_end"
 
-TotalRuns=1
+TotalRuns=10
 # -------------------------
 
 # 1) All available datasets
@@ -58,7 +58,7 @@ MethodNames=(
   "mean"
   "best_distribution"
   "prophet"
-  "kde"
+  "at_kde"
   "lstm"
   "chronos"
   "xgboost"
@@ -153,64 +153,87 @@ if [[ "$seeded_methods_count" -gt 0 && "${#Seeds[@]}" -lt "$TotalRuns" ]]; then
   exit 1
 fi
 
-echo "Begin simulating $TotalRuns runs of data simulation."
+# echo "Begin simulating $TotalRuns runs of data simulation."
 
-# -------------------------
-# MAIN LOOP
-# -------------------------
-for ((i=1; i<=TotalRuns; i++)); do
-  echo "Iteration: $i"
-  echo "-----------------------------"
+# # -------------------------
+# # MAIN LOOP
+# # -------------------------
+# for ((i=1; i<=TotalRuns; i++)); do
+#   echo "Iteration: $i"
+#   echo "-----------------------------"
 
-  for midx in "${SelectedMethodIdx[@]}"; do
-    mname="${MethodNames[$midx]}"
-    mdisp="${MethodDisplayNames[$midx]}"
-    mseedreq="${MethodRequiresSeed[$midx]}"
-    mexcluded="${MethodExcludedDatasets[$midx]}"
+#   for midx in "${SelectedMethodIdx[@]}"; do
+#     mname="${MethodNames[$midx]}"
+#     mdisp="${MethodDisplayNames[$midx]}"
+#     mseedreq="${MethodRequiresSeed[$midx]}"
+#     mexcluded="${MethodExcludedDatasets[$midx]}"
 
-    echo "Running ${mdisp} (method='${mname}') for iteration $i..."
+#     echo "Running ${mdisp} (method='${mname}') for iteration $i..."
 
-    seed=""
-    if [[ "$mseedreq" -eq 1 ]]; then
-      seed="${Seeds[$((i-1))]}"
-      echo "Seed: $seed"
-    fi
+#     seed=""
+#     if [[ "$mseedreq" -eq 1 ]]; then
+#       seed="${Seeds[$((i-1))]}"
+#       echo "Seed: $seed"
+#     fi
 
-    for dataset in "${Datasets[@]}"; do
-      # Skip excluded combinations
-      if [[ -n "$mexcluded" ]]; then
-        # split excluded string into array
-        read -r -a excl_arr <<< "$mexcluded"
-        if contains "$dataset" "${excl_arr[@]}"; then
-          continue
-        fi
-      fi
+#     for dataset in "${Datasets[@]}"; do
+#       # Skip excluded combinations
+#       if [[ -n "$mexcluded" ]]; then
+#         # split excluded string into array
+#         read -r -a excl_arr <<< "$mexcluded"
+#         if contains "$dataset" "${excl_arr[@]}"; then
+#           continue
+#         fi
+#       fi
 
-      # Build python argument list
-      args=(
-        "generate_arrivals.py"
-        "--input_type" "event_log"
-        "--dataset" "$dataset"
-        "--method" "$mname"
-        "--run" "$i"
-        "--tt_split" "$TrainTestSplit"
-        "--start_date" "$TrainStart"
-        "--end_date" "$TrainEnd"
-      )
+#       # Build python argument list
+#       if [[ "$mname" == "at_kde" ]]; then
+#         # Run at_kde for multiple bin sizes (in hours)
+#         for bin_size in 1 5 7; do
+#           args=(
+#             "generate_arrivals.py"
+#             "--input_type" "event_log"
+#             "--dataset" "$dataset"
+#             "--method" "$mname"
+#             "--run" "$i"
+#             "--tt_split" "$TrainTestSplit"
+#             "--start_date" "$TrainStart"
+#             "--end_date" "$TrainEnd"
+#             "--kwargs" "bin_size_hours=${bin_size}"
+#           )
 
-      if [[ "$mseedreq" -eq 1 && -n "$seed" ]]; then
-        args+=("--seed" "$seed")
-      fi
+#           if [[ "$mseedreq" -eq 1 && -n "$seed" ]]; then
+#             args+=("--seed" "$seed")
+#           fi
 
-      python "${args[@]}"
-      # sample run for individual request:
-    #   python generate_arrivals.py --dataset P2P --method at_kde --run 1 --tt_split 0.8 --start_date test_start --end_date test_end
-    done
+#           python "${args[@]}"
+#         done
+#       else
+#         args=(
+#           "generate_arrivals.py"
+#           "--input_type" "event_log"
+#           "--dataset" "$dataset"
+#           "--method" "$mname"
+#           "--run" "$i"
+#           "--tt_split" "$TrainTestSplit"
+#           "--start_date" "$TrainStart"
+#           "--end_date" "$TrainEnd"
+#         )
 
-    echo "Completed ${mdisp} for iteration $i."
-    echo "-----------------------------"
-  done
-done
+#         if [[ "$mseedreq" -eq 1 && -n "$seed" ]]; then
+#           args+=("--seed" "$seed")
+#         fi
+
+#         python "${args[@]}"
+#       fi
+#       # sample run for individual request:
+#       #   python generate_arrivals.py --dataset P2P --method at_kde --run 1 --tt_split 0.8 --start_date test_start --end_date test_end
+#     done
+
+#     echo "Completed ${mdisp} for iteration $i."
+#     echo "-----------------------------"
+#   done
+# done
 
 echo "All runs completed successfully!"
 echo "Running evaluation pipeline..."
@@ -223,7 +246,13 @@ cd "$diagnostics_path"
 echo "Complete."
 
 # Adjust method_types to 'raw' if the methods are run with --prob_day 'False'
-python eval_event_logs.py --res_dir=results --total_runs="$TotalRuns" --metric=CADD --method_types=prob
+# Evaluate all at_kde bin-size variants side-by-side
+python eval_event_logs.py \
+  --res_dir=results \
+  --total_runs="$TotalRuns" \
+  --metric=CADD \
+  --method_types=prob \
+  --methods at_kde_prob_bin_1 at_kde_prob_bin_5 at_kde_prob_bin_7
 
 echo "Evaluation complete."
 echo "-----------------------------"

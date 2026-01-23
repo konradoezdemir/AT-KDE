@@ -30,6 +30,9 @@ class KDEIATGenerator():
             self.float_format = kwargs['float_format'] #transform to timestamps or retain float type (relevant for synthetic case)
         if 'is_event_log' in kwargs:
             self.is_event_log = kwargs['is_event_log'] #declare whether dataset is TPP or event_log, for run-time improvement
+
+        # Bin size for KDE time-of-day bins (in hours); passed to DataSimulator
+        self.bin_size_hours = int(kwargs.get('bin_size_hours', 3))
             
     def generate_arrivals(self, start_time, end_time):
         def _setup_clustered_train_dict(train, prediction_start_t, prediction_end_t, verbose = None):
@@ -142,13 +145,14 @@ class KDEIATGenerator():
             for factor in bw_smooth_factors:
                 bw_factor_dict[list(clustered_train_dict.keys())[0]] = factor
                 ds_class = DataSimulator(
-                            domain = self.domain, 
                             reference_dataset=train_df_clustered, 
+                            domain=self.domain,
                             reference_data_lengths=None,
-                            train_clustered = clustered_train_dict,
-                            test_cluster_estim = output_df,
-                            path = False, 
-                            bw_factor_dict = bw_factor_dict
+                            train_clustered=clustered_train_dict,
+                            test_cluster_estim=output_df,
+                            path=False,
+                            bw_factor_dict=bw_factor_dict,
+                            bin_size_hours=self.bin_size_hours,
                         )
                 simulated_data, _ = ds_class.sample_kde(start_time = val_bw[0], end_time = val_bw[-1])
 
@@ -192,13 +196,14 @@ class KDEIATGenerator():
         # simulate arrivals with KDE  
         self.logger.info('Generating Arrivals now...')
         ds_class = DataSimulator(
-                        domain = self.domain, 
-                        reference_dataset=train_df_clustered, 
+                        reference_dataset=train_df_clustered,
+                        domain=self.domain,
                         reference_data_lengths=None,
-                        train_clustered = clustered_train_dict,
-                        test_cluster_estim = output_df,
-                        path = False, 
-                        bw_factor_dict = optimal_bandwidths_per_global_cluster
+                        train_clustered=clustered_train_dict,
+                        test_cluster_estim=output_df,
+                        path=False,
+                        bw_factor_dict=optimal_bandwidths_per_global_cluster,
+                        bin_size_hours=self.bin_size_hours,
                     )
 
         simulated_data, _ = ds_class.sample_kde(start_time = start_time, end_time = end_time)
